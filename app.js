@@ -971,12 +971,12 @@ function renderPlayers(view) {
     el.classList.toggle('behind', rel !== 0 && a.dir === 'h');
     if (a.compact) {
       // dietro le carte: spunta sopra il bordo superiore
-      el.style.top = `${a.y - ch * .5 - 34}px`; el.style.transform = '';
+      el.style.top = `${a.y - ch * .5 - 26}px`; el.style.transform = '';
       if (rel === 1 && n === 4) { el.style.left = ''; el.style.right = '8px'; }
       else if (rel === 3) el.style.left = '8px';
       else { el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)'; }
     } else if (a.dir === 'h' && rel !== 0) {
-      el.style.top = `${a.y - ch / 2 - 46}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
+      el.style.top = `${a.y - ch / 2 - 40}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
     } else if (a.dir === 'h') {
       el.style.transform = '';
       // accanto alla mia mano, a sinistra
