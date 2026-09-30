@@ -93,10 +93,16 @@ input { font: inherit; }
 .status { color: var(--testo-2); font-size: 14px; min-height: 20px; }
 
 /* ---------- gioco ---------- */
-#game { position: fixed; inset: 0; display: grid; grid-template-rows: 52px minmax(0, 1fr) 64px; grid-template-columns: minmax(0, 1fr); }
-#game.novoice { grid-template-rows: 52px minmax(0, 1fr) 0px; }
+#game { position: fixed; inset: 0; display: grid; grid-template-rows: calc(52px + env(safe-area-inset-top, 0px)) minmax(0, 1fr) calc(64px + env(safe-area-inset-bottom, 0px)); grid-template-columns: minmax(0, 1fr); }
+#game.novoice { grid-template-rows: calc(52px + env(safe-area-inset-top, 0px)) minmax(0, 1fr) env(safe-area-inset-bottom, 0px); }
+.topbar { padding-top: env(safe-area-inset-top, 0px); }
+.bottombar { padding-bottom: calc(env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+.screen { padding-top: calc(24px + env(safe-area-inset-top, 0px)); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.side { padding-top: env(safe-area-inset-top, 0px); }
+.toast { top: calc(64px + env(safe-area-inset-top, 0px)); }
+.ach-toast { top: calc(70px + env(safe-area-inset-top, 0px)); }
 #game.novoice .bottombar { display: none; }
-.bottombar { display: flex; align-items: center; justify-content: center; background: linear-gradient(0deg, rgba(0,0,0,.35), rgba(0,0,0,.1)); border-top: 1px solid rgba(255,255,255,.06); padding: 0 8px env(safe-area-inset-bottom); }
+.bottombar { display: flex; align-items: center; justify-content: center; background: linear-gradient(0deg, rgba(0,0,0,.35), rgba(0,0,0,.1)); border-top: 1px solid rgba(255,255,255,.06); padding: 0 8px; }
 .topbar { display: flex; align-items: center; gap: 14px; padding: 0 14px; min-width: 0; overflow: hidden; background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.15)); border-bottom: 1px solid rgba(255,255,255,.06); z-index: 5; }
 .topbar .spacer { flex: 1; }
 .scores { display: flex; gap: 8px; align-items: center; }
@@ -256,8 +262,8 @@ input { font: inherit; }
 /* responsive */
 @media (max-width: 900px) {
   :root { --card-w: 68px; --card-h: 99px; --radius: 7px; }
-  #game { grid-template-rows: 46px 1fr 58px; }
-  #game.novoice { grid-template-rows: 46px 1fr 0px; }
+  #game { grid-template-rows: calc(46px + env(safe-area-inset-top, 0px)) 1fr calc(58px + env(safe-area-inset-bottom, 0px)); }
+  #game.novoice { grid-template-rows: calc(46px + env(safe-area-inset-top, 0px)) 1fr env(safe-area-inset-bottom, 0px); }
   .felt { inset: 6px; border-radius: 18px; }
   .side { width: min(320px, 92vw); }
   .player .name { max-width: 90px; }
