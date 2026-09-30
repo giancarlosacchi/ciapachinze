@@ -87,7 +87,9 @@
     <div class="stage" id="stage"></div>
     <div class="mstrip hidden" id="mstrip"><span id="ms-deck">mazzo 40</span><span id="ms-mine"></span><span id="ms-theirs"></span></div>
     <div class="choices hidden" id="choices"></div>
-    <div class="hint hidden" id="hint"></div>
+    <svg class="dropzone hidden" id="dropzone" aria-hidden="true"><path id="drop-fill"/><path id="drop-path"/></svg>
+    <svg class="hintarc hidden" id="hintarc" aria-hidden="true"><defs><path id="hint-path"/></defs><text><textPath href="#hint-path" startOffset="50%" text-anchor="middle" id="hint-text"></textPath></text></svg>
+    <div class="chooser hidden" id="chooser"></div>
     <aside class="side" id="side">
       <header><h3 id="side-title">Tavolo</h3><button class="iconbtn" id="btn-side-close">✕</button></header>
       <div class="tabs"><button class="on" data-tab="prese">Prese</button><button data-tab="storico">Storico</button><button data-tab="chat">Chat</button></div>

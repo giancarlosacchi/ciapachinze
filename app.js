@@ -77,7 +77,7 @@ const SUIT_PATH = {
 };
 const suitIcon = (s, x, y, size, col) => `<path d="${SUIT_PATH[s]}" fill="${col}" transform="translate(${x} ${y}) scale(${size / 20})"/>`;
 const FONT_NUM = "'Nunito Sans', 'Arial Black', Arial, sans-serif";
-function cardSVG(id) {
+function cardSVG(id, mattaVal) {
   const r = C.rankOf(id), s = C.suitOf(id), lbl = C.RANK_LABEL[r];
   const red = s === 'H' || s === 'D';
   const col = red ? '#c8202f' : '#1b1a24';
@@ -93,7 +93,7 @@ function cardSVG(id) {
   }
   let badge = '';
   if (id === C.SETTEBELLO) badge = `<g transform="translate(62 8)"><circle cx="9" cy="9" r="9" fill="#d9a621"/><path d="M9 3.5 L10.6 7.2 L14.6 7.5 L11.5 10.1 L12.5 14 L9 11.9 L5.5 14 L6.5 10.1 L3.4 7.5 L7.4 7.2Z" fill="#1b1a24"/></g>`;
-  if (id === C.MATTA) badge = `<g transform="translate(60 6)"><rect width="22" height="14" rx="7" fill="#7fa36c"/><text x="11" y="10.5" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="9" fill="#fff">MATTA</text></g>`;
+  if (id === C.MATTA && mattaVal) badge = `<g transform="translate(42 4)"><rect width="42" height="18" rx="9" fill="#7fa36c"/><text x="21" y="13" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="11" fill="#fff">vale ${mattaVal}</text></g>`;
   return `<svg viewBox="0 0 88 128" xmlns="http://www.w3.org/2000/svg" aria-label="${C.cardName(id)}">
     <text x="8" y="22" font-family="${FONT_NUM}" font-weight="900" font-size="19" fill="${col}">${lbl}</text>
     ${suitIcon(s, 7, 26, 13, col)}
@@ -531,9 +531,10 @@ const Stage = {
         node.classList.remove('no-anim');
         this.nodes.set(it.key, node);
       }
-      if (it.id && node.dataset.id !== it.id) {
-        node.dataset.id = it.id;
-        node.querySelector('.face').innerHTML = cardSVG(it.id);
+      const faceKey = it.id ? it.id + ':' + (it.id === C.MATTA && App.view && App.view.mattaVal ? App.view.mattaVal : '') : '';
+      if (it.id && node.dataset.face !== faceKey) {
+        node.dataset.id = it.id; node.dataset.face = faceKey;
+        node.querySelector('.face').innerHTML = cardSVG(it.id, it.id === C.MATTA && App.view ? App.view.mattaVal : null);
         const s = C.suitOf(it.id);
         node.classList.toggle('red', s === 'H' || s === 'D'); node.classList.toggle('denari', s === 'D');
       }
@@ -600,13 +601,40 @@ const Stage = {
       if (mine && myTurn) node.onpointerdown = e => this.dragStart(e, it.id);
       if (it.table != null) node.onclick = () => this.clickTable(it.table);
     }
-    const hint = $('#hint');
     if (view.phase === 'play') {
-      if (view.pendingBuona && !view.pendingBuona.options) { hint.textContent = `${view.names[view.pendingBuona.seat]} sta dichiarando una buona…`; hint.classList.remove('hidden'); }
-      else if (myTurn) { hint.textContent = hand.length ? 'Tocca a te: trascina una carta in tavola' : ''; hint.classList.remove('hidden'); }
-      else { hint.textContent = `Tocca a ${view.names[view.turn] || ''}`; hint.classList.remove('hidden'); }
-      hint.style.top = (this.seatAnchor(0, view).y - this.ch() / 2 - 30) + 'px';
-    } else hint.classList.add('hidden');
+      if (view.pendingBuona && !view.pendingBuona.options) this.setHint(`${view.names[view.pendingBuona.seat]} sta dichiarando una buona…`, true);
+      else if (myTurn) this.setHint(hand.length ? 'tocca a te · trascina una carta oltre la linea' : '', true);
+      else this.setHint(`tocca a ${view.names[view.turn] || ''}`, true);
+    } else this.setHint('', false);
+  },
+  /* arco che separa la mano dal campo: centro sotto la mano, raggio in funzione delle carte */
+  arc(view) {
+    const a = this.seatAnchor(0, view || App.view), ch = this.ch(), cw = this.cw();
+    const cx = this.W / 2, cy = a.y + ch * .9;
+    const R = Math.min(this.W * .48, this.mobile ? ch * 1.75 + 24 : ch * 1.7 + 60);
+    const t1 = Math.PI * (this.mobile ? .93 : .87), t2 = Math.PI - t1;
+    const p = t => ({ x: cx + R * Math.cos(t), y: cy - R * Math.sin(t) });
+    const s = p(t1), e = p(t2);
+    return { cx, cy, R, s, e, d: `M ${s.x.toFixed(1)} ${s.y.toFixed(1)} A ${R} ${R} 0 0 1 ${e.x.toFixed(1)} ${e.y.toFixed(1)}` };
+  },
+  beyondArc(px, py) { const a = this.arc(); return py < a.cy && Math.hypot(px - a.cx, py - a.cy) > a.R; },
+  setHint(text, on) {
+    const svg = $('#hintarc'); if (!svg) return;
+    if (!on) { svg.classList.add('hidden'); return; }
+    const a = this.arc();
+    svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
+    $('#hint-path').setAttribute('d', a.d);
+    $('#hint-text').textContent = text;
+    svg.classList.remove('hidden');
+  },
+  showDropzone(on, over) {
+    const svg = $('#dropzone'); if (!on) { svg.classList.add('hidden'); return; }
+    const a = this.arc();
+    svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
+    $('#drop-path').setAttribute('d', a.d);
+    $('#drop-fill').setAttribute('d', `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`);
+    svg.classList.toggle('over', !!over);
+    svg.classList.remove('hidden');
   },
   optionsOf(id) {
     const view = App.view;
@@ -645,7 +673,24 @@ const Stage = {
     ch.classList.remove('hidden');
     const slots = this.tableSlots(Math.max(1, view.table.length));
     ch.style.top = Math.max(8, slots[0].y - 54) + 'px';
-    $('#hint').classList.add('hidden');
+    this.setHint('', false);
+  },
+  /* riquadro di scelta tra più prese (dopo il rilascio in campo) */
+  showChooser(id) {
+    const view = App.view, opts = this.currentOptions || [];
+    const box = $('#chooser'); box.innerHTML = '';
+    const h = document.createElement('div'); h.className = 'ch-title'; h.textContent = `Con ${cardShort(id)} puoi prendere:`; box.appendChild(h);
+    opts.forEach((o, i) => {
+      const b = document.createElement('button'); b.className = 'ch-opt'; b.dataset.i = i;
+      const kind = o.kind === 'ace' ? 'asso piglia tutto' : o.kind === 'fifteen' ? 'fa 15' : 'presa';
+      b.innerHTML = `<span class="k ${o.kind}">${kind}</span><span class="minicards">${o.idx.map(k => miniCard(view.table[k].id)).join('')}</span>${o.scopa ? '<b class="sc">scopa!</b>' : ''}`;
+      b.onmouseenter = () => this.focus(i); b.onmouseleave = () => this.focus(null);
+      b.onclick = () => this.play(id, o.idx);
+      box.appendChild(b);
+    });
+    const c = document.createElement('button'); c.className = 'ch-cancel'; c.textContent = 'Rimetti in mano'; c.onclick = () => this.clearSelection(); box.appendChild(c);
+    box.classList.remove('hidden');
+    $('#choices').classList.add('hidden');
   },
   /* evidenzia l'opzione i (o tutte le possibili se null) */
   focus(i) {
@@ -668,11 +713,12 @@ const Stage = {
   clearSelection() {
     const had = this.selected;
     this.selected = null; this.floating = false; this.currentOptions = []; this.focused = null;
-    $('#choices').classList.add('hidden');
+    $('#choices').classList.add('hidden'); $('#chooser').classList.add('hidden');
+    this.showDropzone(false);
     if (App.view) {
       App.view.table.forEach(t => this.nodes.get(t.id)?.classList.remove('target', 'alt', 'target-dim'));
       if (had) this.draw(this.layout(App.view));
-      if (App.view.phase === 'play') $('#hint').classList.remove('hidden');
+      if (App.view.phase === 'play') this.updateInteractivity(App.view);
     }
   },
   play(id, idx) {
@@ -692,21 +738,25 @@ const Stage = {
     const drag = { id, node, x0: e.clientX, y0: e.clientY, ox: it.x, oy: it.y, moved: false, over: false };
     this.drag = drag;
     node.setPointerCapture(e.pointerId);
+    // già alla pressione: evidenzia cosa prende questa carta (seconda pressione sulla stessa = rimetti in mano)
+    if (this.selected === id && !this.floating) { drag.deselect = true; }
+    if (this.selected && this.selected !== id) this.clearSelection();
+    this.selected = id; this.floating = false;
+    this.draw(this.layout(App.view));
+    this.showOptions(id);
+    this.showDropzone(true, false);
     const move = ev => {
       const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
       if (!drag.moved) {
         if (Math.hypot(dx, dy) < 8) return;
         drag.moved = true;
-        if (this.selected && this.selected !== id) this.clearSelection();
-        this.selected = id; this.floating = false;
         node.classList.add('dragging'); node.style.zIndex = 60;
-        this.showOptions(id);
       }
-      node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy}px) rotate(0deg) rotateY(0deg) scale(1.06)`;
-      const handTop = this.seatAnchor(0, App.view).y - this.ch() / 2 - 24;
+      node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy - 28}px) rotate(0deg) rotateY(0deg) scale(1.06)`;
       const r = this.wrap.getBoundingClientRect();
-      drag.over = (ev.clientY - r.top) < handTop;
+      drag.over = this.beyondArc(ev.clientX - r.left, ev.clientY - r.top);
       node.classList.toggle('over-table', drag.over);
+      this.showDropzone(true, drag.over);
       // cosa c'è sotto il dito?
       const under = (document.elementsFromPoint(ev.clientX, ev.clientY) || []).find(el => !node.contains(el)) || null;
       const chip = under && under.closest('.choice');
@@ -725,16 +775,17 @@ const Stage = {
       try { node.releasePointerCapture(ev.pointerId); } catch (x) {}
       node.classList.remove('dragging', 'over-table'); node.style.zIndex = it.z || 2;
       this.drag = null;
-      if (!drag.moved) { this.select(id); return; }                 // era un tocco
+      this.showDropzone(false);
+      if (!drag.moved) { if (drag.deselect) this.clearSelection(); return; }   // tocco: resta selezionata (o torna in mano)
       const opts = this.currentOptions || [];
       if (drag.over) {
         if (this.focused != null && opts[this.focused]) return this.play(id, opts[this.focused].idx);
         if (opts.length === 0) return this.play(id, null);
         if (opts.length === 1) return this.play(id, opts[0].idx);
-        // più prese possibili: la carta resta sospesa in tavola finché non scegli
+        // più prese possibili: la carta resta sospesa in tavola e scegli nel riquadro
         this.floating = true;
         this.draw(this.layout(App.view));
-        toast('Scegli quale presa fare');
+        this.showChooser(id);
         return;
       }
       this.clearSelection();                                        // rimessa in mano
