@@ -687,14 +687,28 @@ const Stage = {
     $('#hint-text').textContent = text;
     svg.classList.remove('hidden');
   },
-  showDropzone(on, over) {
+  /* p: 0 = carta ancora in mano, 1 = oltre la linea. La linea passa da tratteggiata a piena con continuità */
+  showDropzone(on, p) {
     const svg = $('#dropzone'); if (!on) { svg.classList.add('hidden'); return; }
     const a = this.arc();
     svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
-    $('#drop-path').setAttribute('d', a.d);
-    $('#drop-fill').setAttribute('d', `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`);
-    svg.classList.toggle('over', !!over);
+    const path = $('#drop-path'), fill = $('#drop-fill');
+    path.setAttribute('d', a.d);
+    fill.setAttribute('d', `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`);
+    p = clamp(p || 0, 0, 1);
+    path.style.strokeDasharray = `${10 + 30 * p} ${9 * (1 - p)}`;
+    path.style.strokeWidth = (3 + 2.5 * p).toFixed(2);
+    path.style.stroke = `rgba(127,163,108,${(.6 + .4 * p).toFixed(2)})`;
+    path.style.filter = p > .6 ? `drop-shadow(0 0 ${(8 * (p - .6) / .4).toFixed(1)}px rgba(127,163,108,.8))` : 'none';
+    fill.style.fill = `rgba(127,163,108,${(.05 + .12 * p).toFixed(3)})`;
     svg.classList.remove('hidden');
+  },
+  /* quanto la carta si è avvicinata alla linea: 0 vicino alla mano, 1 sulla linea o oltre */
+  arcProgress(px, py) {
+    const a = this.arc();
+    if (py >= a.cy) return 0;
+    const d = Math.hypot(px - a.cx, py - a.cy);
+    return clamp((d - a.R * .45) / (a.R * .55), 0, 1);
   },
   optionsOf(id) {
     const view = App.view;
@@ -802,7 +816,7 @@ const Stage = {
     this.draw(this.layout(App.view));
     this.drag = drag;
     this.showOptions(id);
-    this.showDropzone(true, false);
+    this.showDropzone(true, 0);
     const move = ev => {
       const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
       if (!drag.moved) {
@@ -812,9 +826,10 @@ const Stage = {
       }
       node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy - 28}px) rotate(0deg) rotateY(0deg) scale(1.06)`;
       const r = this.wrap.getBoundingClientRect();
-      drag.over = this.beyondArc(ev.clientX - r.left, ev.clientY - r.top);
+      const px = ev.clientX - r.left, py = ev.clientY - r.top;
+      drag.over = this.beyondArc(px, py);
       node.classList.toggle('over-table', drag.over);
-      this.showDropzone(true, drag.over);
+      this.showDropzone(true, this.arcProgress(px, py));
       // cosa c'è sotto il dito?
       const under = (document.elementsFromPoint(ev.clientX, ev.clientY) || []).find(el => !node.contains(el)) || null;
       const chip = under && under.closest('.choice');
