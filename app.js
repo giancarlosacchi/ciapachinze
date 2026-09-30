@@ -657,8 +657,8 @@ const Stage = {
     const ch = $('#choices'); ch.innerHTML = '';
     const describe = o => o.idx.map(i => cardShort(view.table[i].id)).join(' + ');
     if (!opts.length) {
-      ch.innerHTML = `<button class="choice none">Nessuna presa: lascia ${cardShort(id)} in tavola</button>`;
-      ch.firstChild.onclick = () => this.play(id, null);
+      // nessuna presa: niente scritte, la carta andrà semplicemente in tavola
+      ch.classList.add('hidden'); this.setHint('', false); return;
     } else {
       opts.forEach((o, i) => {
         const b = document.createElement('button'); b.className = 'choice'; b.dataset.i = i;
