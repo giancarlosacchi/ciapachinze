@@ -191,6 +191,7 @@ const Host = {
       case 'again': if (g && g.phase === 'gameEnd') { this.startGame(); } break;
       case 'chat': this.broadcast({ t: 'chat', seat, text: String(msg.text).slice(0, 200) }); break;
       case 'ptt': this.broadcast({ t: 'ptt', seat, on: !!msg.on }); break;
+      case 'call-invite': case 'call-accept': case 'call-decline': case 'call-end': this.broadcast({ t: msg.t, seat }); break;
       case 'swap': if (seat === 0 && !this.started) this.swapSeats(msg.a, msg.b); break;
     }
   },
@@ -289,6 +290,10 @@ const Client = {
       case 'full': toast('Il tavolo è pieno'); break;
       case 'chat': Side.addChat(msg.seat, msg.text); break;
       case 'ptt': Voice.remotePtt(msg.seat, msg.on); break;
+      case 'call-invite': Voice.onInvite(msg.seat); break;
+      case 'call-accept': Voice.onAccept(msg.seat); break;
+      case 'call-decline': Voice.onDecline(msg.seat); break;
+      case 'call-end': Voice.onEnd(msg.seat); break;
       case 'bye': toast('Il tavolo è stato chiuso'); location.hash = ''; setTimeout(() => location.reload(), 1500); break;
     }
   },
@@ -1176,13 +1181,38 @@ const Voice = {
     this.stream.getAudioTracks().forEach(t => t.enabled = en);
     this.ui();
   },
+  nameOf(seat) { const p = App.roster.find(x => x.seat === seat); return p ? p.name : 'Un giocatore'; },
+  /* --- chiamata: chi preme chiama gli altri, che accettano; poi si resta in chiamata --- */
+  async startCall() {
+    if (App.mode === 'solo') { toast('La voce funziona solo con giocatori online'); return; }
+    if (this.mode === 'call') { this.setMode('off'); Client.send({ t: 'call-end' }); return; }
+    try { await this.ensureStream(); } catch (e) { return; }
+    if (this.mode === 'ptt' && this.live) this.pttEnd();
+    this.mode = 'call'; this.applyTrackState();
+    Client.send({ t: 'call-invite' });
+    toast('Chiamata in corso: gli altri devono accettare');
+  },
+  onInvite(seat) {
+    if (seat === App.mySeat) return;
+    if (this.mode === 'call') { Client.send({ t: 'call-accept' }); this.callAll(); return; }
+    if ($('#call-modal')) return;
+    Sound.play('turn');
+    const m = modal(`<h2>📞 ${esc(this.nameOf(seat))} ti chiama<small>Accettando resterete in chiamata per tutta la partita</small></h2>
+      <div class="actions"><button class="btn ghost" id="call-no">Rifiuta</button><button class="btn" id="call-yes">Accetta</button></div>`, { closable: false });
+    m.id = 'call-modal';
+    m.querySelector('#call-no').onclick = () => { m.remove(); Client.send({ t: 'call-decline' }); };
+    m.querySelector('#call-yes').onclick = async () => { m.remove(); try { await this.ensureStream(); } catch (e) { Client.send({ t: 'call-decline' }); return; } if (this.mode === 'ptt' && this.live) this.pttEnd(); this.mode = 'call'; this.applyTrackState(); Client.send({ t: 'call-accept' }); this.callAll(); toast('In chiamata'); };
+  },
+  onAccept(seat) { if (seat !== App.mySeat) { toast(`${this.nameOf(seat)} ha accettato la chiamata`); this.callAll(); } },
+  onDecline(seat) { if (seat !== App.mySeat) toast(`${this.nameOf(seat)} ha rifiutato la chiamata`); },
+  onEnd(seat) { if (seat !== App.mySeat) toast(`${this.nameOf(seat)} ha chiuso la chiamata`); },
   async setMode(m) {
     if (App.mode === 'solo') { toast('La voce funziona solo con giocatori online'); return; }
     if (m === this.mode) m = 'off';
     if (m !== 'off') { try { await this.ensureStream(); } catch (e) { return; } }
     if (this.mode === 'ptt' && this.live) this.pttEnd();
     this.mode = m; this.applyTrackState();
-    toast(m === 'call' ? 'Chiamata attiva: vi sentite sempre' : m === 'ptt' ? 'Walkie-talkie: tieni premuto il pulsante o la barra spaziatrice per parlare' : 'Microfono spento');
+    if (m === 'ptt') toast('Walkie-talkie: tieni premuto per parlare, lascia per ascoltare'); else if (m === 'off') toast('Microfono spento');
   },
   pttStart() { if (this.mode !== 'ptt' || this.live || this.muted) return; this.live = true; this.applyTrackState(); Sound.play('ptt'); Client.send({ t: 'ptt', on: true }); },
   pttEnd() { if (!this.live) return; this.live = false; this.applyTrackState(); Client.send({ t: 'ptt', on: false }); },
@@ -1190,7 +1220,8 @@ const Voice = {
     $('#btn-call').classList.toggle('on', this.mode === 'call');
     $('#btn-ptt').classList.toggle('on', this.mode === 'ptt');
     $('#btn-ptt').classList.toggle('live', this.live);
-    $('#btn-ptt').querySelector('.lbl').textContent = this.mode === 'ptt' ? (this.live ? 'Stai parlando…' : 'Tieni premuto') : 'Walkie-talkie';
+    $('#btn-ptt').querySelector('.lbl').textContent = this.live ? 'Stai parlando…' : 'Walkie-talkie';
+    $('#btn-call').querySelector('.lbl').textContent = this.mode === 'call' ? 'In chiamata' : 'Chiamata';
     $('#btn-mute').classList.toggle('on', this.muted);
     $('#btn-mute').textContent = this.muted ? '🔇' : '🎤';
   },
@@ -1226,13 +1257,19 @@ $('#chat-send').onclick = () => { const i = $('#chat-input'); const t = i.value.
 $('#chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#chat-send').click(); e.stopPropagation(); });
 $('#btn-sound').onclick = () => { Sound.on = !Sound.on; $('#btn-sound').textContent = Sound.on ? '🔔' : '🔕'; };
 $('#btn-sound').textContent = Sound.on ? '🔔' : '🔕';
-$('#btn-call').onclick = () => Voice.setMode('call');
-$('#btn-ptt').onclick = e => { if (Voice.mode !== 'ptt') Voice.setMode('ptt'); };
+$('#btn-call').onclick = () => Voice.startCall();
+
 $('#btn-mute').onclick = () => { Voice.muted = !Voice.muted; Voice.applyTrackState(); if (!Voice.stream) Voice.ui(); };
 const ptt = $('#btn-ptt');
 ptt.addEventListener('contextmenu', e => e.preventDefault());
-ptt.addEventListener('pointerdown', e => { if (Voice.mode === 'ptt') { ptt.setPointerCapture(e.pointerId); Voice.pttStart(); } });
-['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => ptt.addEventListener(ev, () => Voice.pttEnd()));
+let pttPressed = false;
+ptt.addEventListener('pointerdown', async e => {
+  pttPressed = true;
+  try { ptt.setPointerCapture(e.pointerId); } catch (x) {}
+  if (Voice.mode !== 'ptt') { await Voice.setMode('ptt'); }
+  if (Voice.mode === 'ptt' && pttPressed) Voice.pttStart();
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => ptt.addEventListener(ev, () => { pttPressed = false; Voice.pttEnd(); }));
 window.addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && Voice.mode === 'ptt') { e.preventDefault(); Voice.pttStart(); } });
 window.addEventListener('keyup', e => { if (e.code === 'Space' && Voice.mode === 'ptt') { e.preventDefault(); Voice.pttEnd(); } });
 window.addEventListener('blur', () => Voice.pttEnd());
