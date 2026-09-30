@@ -66,6 +66,8 @@
       <button class="iconbtn" id="btn-achievements" title="Traguardi">🏅</button>
     </div>
     <h2 class="arcade-title">Il giro della Liguria</h2>
+    <div class="seg arcade-mode" id="arcade-mode"><button data-v="solo" class="on">1 vs 1 · da solo</button><button data-v="coop">2 vs 2 · con un amico</button></div>
+    <p class="status" id="arcade-note" style="margin:8px 0 14px"></p>
     <div class="map" id="map"></div>
   </div>
 </section>
@@ -111,10 +113,10 @@
   <div class="stage-wrap" id="stage-wrap">
     <div class="felt"></div>
     <div class="stage" id="stage"></div>
-    <div class="mstrip hidden" id="mstrip"><span id="ms-deck">mazzo: 40 carte</span></div>
+    <div class="mstrip hidden" id="mstrip"><span id="ms-deck">40 nel mazzo</span></div>
     <div class="choices hidden" id="choices"></div>
     <svg class="dropzone hidden" id="dropzone" aria-hidden="true"><path id="drop-fill"/><path id="drop-path"/><path id="drop-solid"/></svg>
-    <svg class="hintarc hidden" id="hintarc" aria-hidden="true"><defs><path id="hint-path"/></defs><text><textPath href="#hint-path" startOffset="50%" text-anchor="middle" id="hint-text"></textPath></text></svg>
+    <svg class="hintarc hidden" id="hintarc" aria-hidden="true"><defs><path id="hint-path"/></defs><path id="hint-glow"/><text><textPath href="#hint-path" startOffset="50%" text-anchor="middle" id="hint-text"></textPath></text></svg>
     <div class="chooser hidden" id="chooser"></div>
     <div class="review-bar hidden" id="review-bar"><span id="review-lbl"></span><button class="btn sm oro" id="review-close">Torna al riepilogo</button></div>
     <aside class="side" id="side">

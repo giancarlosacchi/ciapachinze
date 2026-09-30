@@ -173,8 +173,11 @@ input { font: inherit; }
 .player .avatar::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid transparent; }
 .player .mic { font-size: 12px; opacity: .7; }
 .player.offline { opacity: .5; }
-.player.behind { z-index: 1; padding-bottom: 8px; border-radius: 12px 12px 6px 6px; }
-.player.behind.compact { padding: 3px 8px 6px 3px; }
+.player.label { z-index: 4; padding: 3px 10px 3px 4px; background: rgba(0,0,0,.45); border-color: rgba(255,255,255,.12); backdrop-filter: blur(4px); }
+.player.label .avatar { width: 22px; height: 22px; font-size: 10px; }
+.player.label .name { font-size: 12px; max-width: 120px; }
+.player.label .sub { display: none; }
+.player.label.turn { box-shadow: 0 0 0 2px var(--oro-2), 0 0 14px rgba(240,199,80,.45); }
 .player.team0 .avatar { background: var(--oro-2); } .player.team1 .avatar { background: #8ec1dc; }
 
 /* opzioni presa */
@@ -305,8 +308,8 @@ input { font: inherit; }
 }
 
 /* striscia informativa su smartphone: mazzo e prese */
-.mstrip { position: absolute; left: 10px; top: 8px; display: flex; justify-content: flex-start; gap: 6px; z-index: 4; font-size: 11px; color: var(--testo-2); }
-.mstrip span { background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); border-radius: 999px; padding: 4px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mstrip { position: absolute; left: 12px; top: 10px; display: flex; justify-content: flex-start; gap: 6px; z-index: 4; font-size: 11px; color: var(--testo-2); }
+.mstrip span { background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.06); border-radius: 999px; padding: 3px 8px; color: rgba(255,255,255,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mstrip #ms-mine { box-shadow: inset 2px 0 0 var(--oro); }
 .mstrip #ms-theirs { box-shadow: inset 2px 0 0 var(--mare); }
 .player.compact { padding: 3px 7px 3px 3px; }
@@ -320,6 +323,11 @@ input { font: inherit; }
 .dropzone #drop-path { fill: none; stroke: rgba(190,230,170,.7); stroke-width: 3; stroke-dasharray: 10 9; stroke-linecap: round; }
 .dropzone #drop-solid { fill: none; stroke: #bfe6a8; stroke-width: 3; stroke-linecap: round; opacity: 0; transition: opacity .08s linear, stroke-width .08s linear; }
 .hintarc text { fill: var(--testo-2); font-family: var(--font-display); font-style: italic; font-size: 15px; letter-spacing: .04em; }
+.hintarc #hint-glow { fill: none; stroke: #bfe6a8; stroke-width: 3; stroke-linecap: round; opacity: 0; }
+.hintarc.myturn #hint-glow { animation: breathe 2.2s ease-in-out infinite; }
+.hintarc.myturn text { fill: #d8f0c8; }
+@keyframes breathe { 0%, 100% { opacity: .08; stroke-width: 2; } 50% { opacity: .75; stroke-width: 4; filter: drop-shadow(0 0 8px rgba(190,230,170,.8)); } }
+@media (prefers-reduced-motion: reduce) { .hintarc.myturn #hint-glow { animation: none; opacity: .5; } }
 .chooser { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; background: rgba(12,20,26,.96); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; width: min(360px, 92%); box-shadow: 0 30px 70px rgba(0,0,0,.6); backdrop-filter: blur(10px); animation: pop .25s var(--ease); }
 .chooser .ch-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--avorio); margin-bottom: 4px; }
 .chooser .ch-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--avorio); text-align: left; }
@@ -412,4 +420,9 @@ input { font: inherit; }
 .ach-toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 70; display: flex; gap: 12px; align-items: center; background: linear-gradient(90deg, #8a6a12, #4f3c0a); border: 1px solid var(--oro-2); border-radius: 14px; padding: 10px 16px; color: var(--avorio); box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: pop .4s var(--ease); }
 .ach-toast .ic { font-size: 28px; }
 .ach-toast small { display: block; color: rgba(255,255,255,.75); }
-@media (max-width: 640px) { .goalbar { bottom: auto; top: 8px; left: auto; right: 10px; transform: none; font-size: 11px; max-width: 62%; padding: 4px 9px; } }
+@media (max-width: 640px) { .goalbar { bottom: auto; top: 10px; left: auto; right: 12px; transform: none; font-size: 11px; max-width: 62%; padding: 3px 8px; background: rgba(0,0,0,.3); border-color: rgba(255,255,255,.06); } }
+
+.mstrip.low { top: auto; bottom: 12px; left: 12px; }
+
+.arcade-mode { max-width: 420px; margin-bottom: 6px; }
+.arcade-mode button.on { background: var(--oro-2); border-color: var(--oro-2); color: var(--inchiostro); }

@@ -345,6 +345,7 @@ const Client = {
       case 'call-accept': Voice.onAccept(msg.seat); break;
       case 'call-decline': Voice.onDecline(msg.seat); break;
       case 'call-end': Voice.onEnd(msg.seat); break;
+      case 'stage-result': if (App.mode === 'guest') { $$('#modals .modal-bg').forEach(x => x.remove()); const m = modal(`<h2>${msg.stars ? 'Tappa superata!' : 'Tappa fallita'}<small>${esc(msg.town)} · ${esc(msg.who)}</small></h2><div class="stars-big">${'★'.repeat(msg.stars)}<span class="off">${'★'.repeat(3 - msg.stars)}</span></div><p style="text-align:center">${msg.stars ? 'Obiettivo centrato: ' : 'Obiettivo mancato: '}${esc(msg.goal)}. Il tuo compagno sceglie la prossima tappa.</p><div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Ok</button></div>`); m.querySelector('.modal').classList.add(msg.stars ? 'won' : 'lost'); if (msg.stars) Stage.sparks(); } break;
       case 'bye': toast('Il tavolo è stato chiuso'); Session.clear(); location.hash = ''; setTimeout(() => location.reload(), 1500); break;
     }
   },
@@ -415,14 +416,14 @@ function renderLobby() {
     d.innerHTML = p ? `<div class="avatar">${initials(p.name)}</div><div class="who">${esc(p.name)}${p.seat === App.mySeat ? ' (tu)' : ''} ${p.online ? '' : '<span class="offline">· offline</span>'}<div class="team">${n === 4 ? (team === 0 ? 'Coppia oro' : 'Coppia blu') : ''} ${i === 0 ? '· ospite del tavolo' : ''}</div></div>`
       : `<div class="avatar" style="background:rgba(255,255,255,.1);color:var(--testo-2)">?</div><div class="who" style="color:var(--testo-2);font-weight:400">Posto libero — condividi il codice</div>`;
     if (App.mode === 'host' && !Host.started) {
-      if (!p) {
+      if (!p && !(App.arcade)) {
         const b = document.createElement('button'); b.className = 'btn sm oro'; b.textContent = '+ computer'; b.title = 'Fai giocare il computer in questo posto';
         b.onclick = () => Host.addBot(i); d.appendChild(b);
-      } else if (p.bot) {
+      } else if (p && p.bot && !App.arcade) {
         const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '✕'; b.title = 'Togli il computer';
         b.onclick = () => Host.removeBot(i); d.appendChild(b);
       }
-      if (n === 4 && p && !p.bot && p.seat !== App.mySeat) {
+      if (n === 4 && p && !p.bot && p.seat !== App.mySeat && !App.arcade) {
         const withMe = (i % 2) === (App.mySeat % 2);
         const b = document.createElement('button'); b.className = 'pairbtn ' + (withMe ? 'mine' : 'theirs');
         b.innerHTML = withMe ? '<span class="dot"></span>Con me' : '<span class="dot"></span>Contro';
@@ -441,11 +442,13 @@ function renderLobby() {
   $('#lobby-record').textContent = rec ? `Precedenti con ${rec.name}: ${rec.w} vinte · ${rec.l} perse` : '';
   const humans = App.roster.filter(p => !p.bot);
   const full = App.roster.length >= n && App.roster.every(p => p.online);
-  const canStart = App.mode === 'host' && App.roster.every(p => p.online) && (full || humans.length >= 1);
+  const coop = !!(App.arcade && App.mode === 'host');
+  const canStart = App.mode === 'host' && App.roster.every(p => p.online) && (full || (humans.length >= 1 && !coop));
   $('#btn-start').disabled = !canStart;
-  $('#btn-start').textContent = full ? 'Inizia la partita' : 'Inizia (il computer prende i posti liberi)';
+  $('#btn-start').textContent = coop ? (full ? 'Inizia la tappa' : 'Aspetta il tuo compagno') : full ? 'Inizia la partita' : 'Inizia (il computer prende i posti liberi)';
   $('#btn-start').classList.toggle('hidden', App.mode !== 'host');
-  $('#lobby-info').textContent = n === 4 ? 'A coppie: i posti 1 e 3 giocano insieme (oro), 2 e 4 insieme (blu). Con ↕ sposti un amico nell\'altra coppia; i posti vuoti li può prendere il computer.' : 'Uno contro uno, si vince a ' + App.cfg.target + '. Se non arriva nessuno puoi far giocare il computer.';
+  if (App.arcade && ArcadeUI.stage) $('#lobby-info').textContent = `Arcade a coppie · ${ArcadeUI.stage.town}: ${Arcade.goalText(ArcadeUI.stage.goal)}. Invita un amico con il link: sarà il tuo compagno.`;
+  else $('#lobby-info').textContent = n === 4 ? 'A coppie: i posti 1 e 3 giocano insieme (oro), 2 e 4 insieme (blu). Con "Con me / Contro" sposti un amico di coppia; i posti vuoti li può prendere il computer.' : 'Uno contro uno, si vince a ' + App.cfg.target + '. Se non arriva nessuno puoi far giocare il computer.';
   const missing = n - App.roster.length;
   $('#lobby-status').textContent = App.mode === 'host' ? (full ? 'Tutti al tavolo: puoi iniziare.' : `${missing} post${missing === 1 ? 'o libero' : 'i liberi'}: aspetta gli amici o aggiungi il computer.`) : 'In attesa che l\'ospite inizi la partita…';
 }
@@ -530,13 +533,13 @@ const Stage = {
     if (this.mobile) {
       // smartphone: la mia mano in basso, tutti gli avversari in alto (sinistra / centro / destra)
       if (rel === 0) return { x: W / 2 + 16, y: H - ch / 2 - 10, rot: 0, dir: 'h' };
-      const top = ch / 2 + 58;
+      const top = ch / 2 + 40;
       if (n === 2 || rel === 2) return { x: W / 2, y: top, rot: 0, dir: 'h', compact: true };
       if (rel === 1) return { x: W - cw * .85 - 10, y: top, rot: -12, dir: 'h', compact: true };
       return { x: cw * .85 + 10, y: top, rot: 12, dir: 'h', compact: true };
     }
     if (rel === 0) return { x: W / 2, y: H - ch / 2 - 18, rot: 0, dir: 'h' };
-    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + 40, rot: 0, dir: 'h' };
+    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + 22, rot: 0, dir: 'h' };
     if (rel === 1) return { x: W - ch / 2 - 16, y: H / 2, rot: -90, dir: 'v' };
     return { x: ch / 2 + 16, y: H / 2, rot: 90, dir: 'v' };
   },
@@ -714,7 +717,7 @@ const Stage = {
     this.draw(this.layout(view));
     const mob = this.mobile;
     $('#deck').classList.toggle('hidden', mob); $('#mstrip').classList.toggle('hidden', !mob);
-    if (mob) $('#ms-deck').textContent = `mazzo: ${view.deckCount} carte`;
+    if (mob) { $('#ms-deck').textContent = `${view.deckCount} nel mazzo`; $('#mstrip').classList.toggle('low', view.cfg.players === 4); }
     const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount ? `${view.deckCount} carte nel mazzo` : 'mazzo finito';
     deck.style.opacity = view.deckCount ? 1 : .25;
     const my = C.teamOf(view, App.mySeat);
@@ -722,7 +725,7 @@ const Stage = {
       const p = $('#pile' + t), pp = this.pilePos(t, view);
       p.style.left = pp.x + 'px'; p.style.top = pp.y + 'px';
       const nc = view.captured[t].length, sc = view.scope[t];
-      p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '') + (t === my ? '' : ' theirs');
+      p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '') + (t === my ? '' : ' theirs') + (mob && !nc ? ' hidden' : '');
       p.style.transform = `scale(${this.pileScale()})`;
       p.querySelector('.lbl').textContent = nc ? '' : (t === my ? (view.cfg.players === 4 ? 'le nostre prese' : 'le tue prese') : (view.cfg.players === 4 ? 'le loro prese' : 'le sue prese'));
       p.querySelector('.cnt').textContent = '';
@@ -748,9 +751,10 @@ const Stage = {
       if (mine && myTurn) node.onpointerdown = e => this.dragStart(e, it.id);
       if (it.table != null) node.onclick = () => this.clickTable(it.table);
     }
+    const arcEl = $('#hintarc'); if (arcEl) arcEl.classList.toggle('myturn', !!myTurn);
     if (view.phase === 'play') {
       if (view.pendingBuona && !view.pendingBuona.options) this.setHint(`${view.names[view.pendingBuona.seat]} sta dichiarando una buona…`, true);
-      else if (myTurn) this.setHint(hand.length ? 'tocca a te · trascina una carta oltre la linea' : '', true);
+      else if (myTurn) this.setHint(hand.length ? 'tocca a te' : '', true);
       else this.setHint(`tocca a ${view.names[view.turn] || ''}`, true);
     } else this.setHint('', false);
   },
@@ -771,6 +775,7 @@ const Stage = {
     const a = this.arc();
     svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
     $('#hint-path').setAttribute('d', a.d);
+    $('#hint-glow').setAttribute('d', a.d);
     $('#hint-text').textContent = text;
     svg.classList.remove('hidden');
   },
@@ -1060,27 +1065,25 @@ function renderPlayers(view) {
     if (!el) { el = document.createElement('div'); el.className = 'player'; el.innerHTML = `<div class="avatar"></div><div><div class="name"></div><div class="sub"></div></div><span class="mic"></span>`; Stage.el.appendChild(el); Stage.playerEls.set(s, el); }
     const p = App.roster.find(x => x.seat === s) || {};
     const name = view.names[s] || p.name || '…';
-    el.querySelector('.avatar').textContent = initials(name);
+    const rel = Stage.rel(s, view);
+    el.querySelector('.avatar').textContent = initials(name).slice(0, rel === 0 ? 2 : 1);
     el.querySelector('.name').textContent = s === App.mySeat ? `${name} (tu)` : name;
     const team = C.teamOf(view, s);
     const sub = [n === 4 ? (team === C.teamOf(view, App.mySeat) ? 'tua coppia' : 'avversari') : '', view.dealer === s ? 'mazziere' : '', view.faceUp[s] ? 'carte scoperte' : ''].filter(Boolean).join(' · ');
     el.querySelector('.sub').textContent = sub;
     el.className = `player team${team === C.teamOf(view, App.mySeat) ? 0 : 1}` + (view.phase === 'play' && view.turn === s ? ' turn' : '') + (view.dealer === s ? ' dealer' : '') + (p.online === false ? ' offline' : '') + (Voice.speaking.has(s) ? ' speaking' : '');
     el.querySelector('.mic').textContent = Voice.speaking.has(s) ? '🎙' : '';
-    const rel = Stage.rel(s, view), a = Stage.seatAnchor(rel, view), cw = Stage.cw(), ch = Stage.ch();
+    const a = Stage.seatAnchor(rel, view), cw = Stage.cw(), ch = Stage.ch();
     el.style.right = '';
     el.classList.toggle('hidden', Stage.mobile && rel === 0);
     el.classList.toggle('compact', !!a.compact);
     el.title = sub;
-    el.classList.toggle('behind', rel !== 0 && a.dir === 'h');
+    el.classList.toggle('label', rel !== 0);
     if (a.compact) {
-      // dietro le carte: spunta sopra il bordo superiore
-      el.style.top = `${a.y - ch * .5 - 26}px`; el.style.transform = '';
-      if (rel === 1 && n === 4) { el.style.left = ''; el.style.right = '8px'; }
-      else if (rel === 3) el.style.left = '8px';
-      else { el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)'; }
+      // etichetta sotto le carte, centrata sul mazzetto di carte
+      el.style.top = `${a.y + ch * .5 + 6}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
     } else if (a.dir === 'h' && rel !== 0) {
-      el.style.top = `${a.y - ch / 2 - 40}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
+      el.style.top = `${a.y + ch / 2 + 8}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
     } else if (a.dir === 'h') {
       el.style.transform = '';
       // accanto alla mia mano, a sinistra
@@ -1088,11 +1091,9 @@ function renderPlayers(view) {
       el.style.top = `${a.y - 20}px`;
       el.style.left = ''; el.style.right = `${Stage.W - (a.x - half - 14)}px`;
     } else {
-      el.style.transform = '';
-      // sotto la mano verticale
+      // sotto la mano verticale, centrata
       const half = cw * 0.55 + ch / 2;
-      el.style.top = `${a.y + half + 12}px`;
-      if (rel === 1) { el.style.left = ''; el.style.right = '16px'; } else el.style.left = '16px';
+      el.style.top = `${a.y + half + 10}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
     }
   }
 }
@@ -1379,7 +1380,7 @@ $('#btn-copy-code').onclick = () => navigator.clipboard.writeText(App.code).then
 $('#btn-copy-link').onclick = () => navigator.clipboard.writeText(inviteLink()).then(() => toast('Link copiato: mandalo agli amici'));
 if (navigator.share) { $('#btn-share').style.display = ''; $('#btn-share').onclick = () => navigator.share({ title: 'Ciapachinze', text: `Vieni a giocare a cirulla! Codice tavolo ${App.code}`, url: inviteLink() }).catch(() => {}); }
 $('#btn-side').onclick = () => Side.open();
-$('#game .wordmark').onclick = () => { if (App.mode === 'solo') { const m = modal(`<h2>Lasciare il tavolo?</h2><div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Resta</button><button class="btn" id="leave-yes">Esci</button></div>`); m.querySelector('#leave-yes').onclick = () => { m.remove(); const wasArcade = !!App.arcade; ArcadeUI.leave(); App.mode = null; showScreen(wasArcade ? 'scr-arcade' : 'scr-home'); if (wasArcade) ArcadeUI.open(); }; } };
+$('#game .wordmark').onclick = () => { if (App.mode === 'solo' || (App.arcade && App.mode === 'host')) { const m = modal(`<h2>Lasciare il tavolo?</h2><div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Resta</button><button class="btn" id="leave-yes">Esci</button></div>`); m.querySelector('#leave-yes').onclick = () => { m.remove(); const wasArcade = !!App.arcade; ArcadeUI.leave(); App.mode = null; showScreen(wasArcade ? 'scr-arcade' : 'scr-home'); if (wasArcade) ArcadeUI.open(); }; } };
 $('#btn-side-close').onclick = () => Side.close();
 $$('.tabs button').forEach(b => b.onclick = () => Side.setTab(b.dataset.tab));
 $('#chat-send').onclick = () => { const i = $('#chat-input'); const t = i.value.trim(); if (!t) return; Client.send({ t: 'chat', text: t }); i.value = ''; };
@@ -1407,26 +1408,29 @@ Voice.ui();
    ARCADE: mappa, tappe, obiettivi, traguardi
    ===================================================================== */
 const ArcadeUI = {
-  prog: null, stage: null, dealsPlayed: 0, goalDone: false, bonusDone: false,
+  prog: null, stage: null, dealsPlayed: 0, goalDone: false, bonusDone: false, mode: 'solo',
   open() { this.prog = Arcade.load(); this.renderMap(); showScreen('scr-arcade'); },
+  setMode(m) { this.mode = m; $$('#arcade-mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); this.renderMap(); },
   homeProgress() {
     const p = Arcade.load(); const done = p.stats.stagesDone, tot = Arcade.STAGES.length, stars = Arcade.totalStars(p);
     $('#arcade-progress').innerHTML = `<span>${done}/${tot} tappe</span><div class="bar"><i style="width:${Math.round(done / tot * 100)}%"></i></div><span>★ ${stars}</span>`;
     $('#btn-arcade').textContent = done === 0 ? 'Parti da Ventimiglia' : done >= tot ? 'Rigioca il giro' : 'Continua il giro';
   },
   renderMap() {
-    const p = this.prog; $('#stars-total').textContent = `★ ${Arcade.totalStars(p)} / ${Arcade.STAGES.length * 3}`;
+    const p = this.prog; const list = Arcade.stagesFor(this.mode);
+    $('#stars-total').textContent = `★ ${list.reduce((a, st) => a + (p.stars[st.id] || 0), 0)} / ${list.length * 3}`;
+    $('#arcade-note').textContent = this.mode === 'coop' ? 'A coppie: apri il tavolo, invita un amico con il codice e affrontate insieme due computer. Il progresso resta su questo telefono.' : '';
     const map = $('#map'); map.innerHTML = '';
     let nextFound = false;
     Arcade.ZONES.forEach((z, zi) => {
       const zone = document.createElement('div'); zone.className = 'zone';
       zone.innerHTML = `<h3><i style="background:${z.color}"></i>${esc(z.name)}</h3><div class="stages"></div>`;
       const grid = zone.querySelector('.stages');
-      Arcade.STAGES.filter(st => st.zone === zi).forEach(st => {
-        const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlocked(p, st.id);
+      list.filter(st => st.zone === zi).forEach(st => {
+        const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlockedIn(p, list, st.id);
         const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
         const b = document.createElement('button'); b.className = 'stage' + (stars ? ' done' : '') + (isNext ? ' next' : ''); b.disabled = !unlocked;
-        b.innerHTML = `<span class="n">Tappa ${st.id} · ${st.players === 4 ? '2 vs 2' : '1 vs 1'}</span><span class="town">${esc(st.town)}</span><span class="who">${esc(st.who)}</span><span class="st">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></span>${unlocked ? '' : '<span class="lock">🔒</span>'}`;
+        b.innerHTML = `<span class="n">Tappa ${list.indexOf(st) + 1} · ${st.players === 4 ? '2 vs 2' : '1 vs 1'}</span><span class="town">${esc(st.town)}</span><span class="who">${esc(st.who)}</span><span class="st">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></span>${unlocked ? '' : '<span class="lock">🔒</span>'}`;
         b.onclick = () => this.brief(st);
         grid.appendChild(b);
       });
@@ -1435,13 +1439,14 @@ const ArcadeUI = {
   },
   brief(st) {
     const stars = this.prog.stars[st.id] || 0;
-    const m = modal(`<h2>${esc(st.town)}<small>Tappa ${st.id} · contro ${esc(st.who)}</small></h2>
+    const list = Arcade.stagesFor(this.mode);
+    const m = modal(`<h2>${esc(st.town)}<small>Tappa ${list.indexOf(st) + 1} · contro ${esc(st.who)}</small></h2>
       <p>${esc(st.intro)}</p>
       <div class="opt" style="cursor:default"><span style="font-size:22px">🎯</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
       <div class="opt" style="cursor:default"><span style="font-size:22px">🌟</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
       <p style="font-size:13px">Difficoltà del computer: ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]} · ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} finora</p>
-      <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">Gioca</button></div>`);
-    m.querySelector('#stage-go').onclick = () => { m.remove(); this.start(st); };
+      <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">${this.mode === 'coop' ? 'Apri il tavolo e invita' : 'Gioca'}</button></div>`);
+    m.querySelector('#stage-go').onclick = () => { m.remove(); this.mode === 'coop' ? this.startCoop(st) : this.start(st); };
   },
   start(st) {
     this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
@@ -1452,6 +1457,15 @@ const ArcadeUI = {
     hostRoom({ players: st.players, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0 }, botLevel: st.level, botNames }, localStorage.getItem('cpz-name') || 'Tu', true);
     App.mode = 'solo'; App.arcade = st;
     setTimeout(() => this.goalbar(), 50);
+  },
+  startCoop(st) {
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
+    App.seenEventId = 0; App.view = null; App.arcade = st;
+    const name = localStorage.getItem('cpz-name') || 'Tu';
+    hostRoom({ players: 4, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0, coop: true }, botLevel: st.level }, name, false);
+    // due avversari computer ai posti 1 e 3; il posto 2 (il mio compagno) resta per l'amico
+    setTimeout(() => { Host.addBot(1); Host.addBot(3); const b1 = Host.players.find(p => p.seat === 1), b3 = Host.players.find(p => p.seat === 3); if (b1) { b1.name = st.who; b1.level = st.level; } if (b3) { b3.name = st.who + ' 2'; b3.level = st.level; } Host.broadcastLobby(); }, 50);
+    setTimeout(() => { $('#lobby-info').textContent = `Arcade a coppie · ${st.town}: ${Arcade.goalText(st.goal)}. Invita un amico con il link: sarà il tuo compagno.`; }, 120);
   },
   goalbar() {
     let g = $('#goalbar'); if (!g) { g = document.createElement('div'); g.id = 'goalbar'; g.className = 'goalbar'; $('#stage-wrap').appendChild(g); }
@@ -1480,6 +1494,7 @@ const ArcadeUI = {
     const fresh2 = Arcade.recordStage(this.prog, st, stars);
     this.toastAch(fresh2);
     this.result = { stars, won: stars > 0 };
+    if (App.mode === 'host') Host.broadcast({ t: 'stage-result', stars, town: st.town, who: st.who, goal: Arcade.goalText(st.goal) });
     return true;
   },
   toastAch(list) {
@@ -1501,6 +1516,7 @@ const ArcadeUI = {
     const nb = m.querySelector('#res-next'); if (nb) nb.onclick = () => { m.remove(); this.leave(); this.start(nextSt); };
   },
   leave() {
+    if (App.mode === 'host' && App.peer) { try { Host.broadcast({ t: 'bye' }); App.peer.destroy(); } catch (e) {} App.peer = null; Session.clear(); }
     this.stage = null; App.arcade = null; App.view = null; App.seenEventId = 0;
     clearTimeout(Host.botTimer); Host.game = null;
     Stage.nodes.forEach(n => n.remove()); Stage.nodes.clear(); Stage.playerEls.forEach(e => e.remove()); Stage.playerEls.clear();
@@ -1510,6 +1526,7 @@ const ArcadeUI = {
   },
 };
 $('#btn-arcade').onclick = () => ArcadeUI.open();
+$$('#arcade-mode button').forEach(b => b.onclick = () => ArcadeUI.setMode(b.dataset.v));
 $('#arcade-back').onclick = () => { showScreen('scr-home'); ArcadeUI.homeProgress(); };
 $('#btn-achievements').onclick = () => {
   const p = Arcade.load();

@@ -201,6 +201,8 @@
     { id: 'zone3', name: 'Zeneise', desc: 'Completa Genova', icon: '⚓', check: s => s.zonesDone.includes(2) },
     { id: 'stars3x5', name: 'Tre stelle', desc: 'Prendi 3 stelle in 5 tappe', icon: '🌟', check: s => s.threeStars >= 5 },
     { id: 'all', name: 'Re della cirulla', desc: 'Completa tutte le tappe', icon: '🏆', check: s => s.stagesDone >= STAGES.length },
+    { id: 'coop1', name: 'In coppia', desc: 'Supera una tappa a coppie con un amico', icon: '🤝', check: s => (s.coopDone || 0) >= 1 },
+    { id: 'coopAll', name: 'Coppia d\'oro', desc: 'Completa tutto il giro a coppie', icon: '🥇', check: s => (s.coopDone || 0) >= COOP_STAGES.length },
     { id: 'perfect', name: 'Giro perfetto', desc: '3 stelle su tutte le tappe', icon: '💎', check: s => s.threeStars >= STAGES.length },
   ];
 
@@ -209,7 +211,7 @@
   function load() {
     try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { return blank(); }
   }
-  function blank() { return { stars: {}, unlocked: [], stats: { stagesDone: 0, scope: 0, settebello: 0, buone: 0, decini: 0, piccola: 0, grande: 0, cappotti: 0, cleanDeals: 0, streak: 0, bestStreak: 0, zonesDone: [], threeStars: 0, dealsWon: 0, dealsLost: 0 } }; }
+  function blank() { return { stars: {}, unlocked: [], stats: { coopDone: 0, stagesDone: 0, scope: 0, settebello: 0, buone: 0, decini: 0, piccola: 0, grande: 0, cappotti: 0, cleanDeals: 0, streak: 0, bestStreak: 0, zonesDone: [], threeStars: 0, dealsWon: 0, dealsLost: 0 } }; }
   function save(p) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {} }
   function isUnlocked(p, id) { return id === 1 || (p.stars[id - 1] || 0) >= 1; }
   function totalStars(p) { return Object.values(p.stars).reduce((a, b) => a + b, 0); }
@@ -235,6 +237,7 @@
     } else s.streak = 0;
     s.threeStars = Object.values(p.stars).filter(v => v === 3).length;
     ZONES.forEach((z, zi) => { if (!s.zonesDone.includes(zi) && STAGES.filter(st => st.zone === zi).every(st => (p.stars[st.id] || 0) >= 1)) s.zonesDone.push(zi); });
+    s.coopDone = COOP_STAGES.filter(st => (p.stars[st.id] || 0) >= 1).length;
     return unlockAchievements(p);
   }
   function unlockAchievements(p) {
@@ -246,5 +249,28 @@
   function goalText(g) { const G = GOALS[g[0]]; return typeof G.text === 'function' ? G.text(g[1]) : G.text; }
   function goalCheck(g, ctx) { return !!GOALS[g[0]].check(ctx, g[1]); }
 
-  root.Arcade = { STAGES, ZONES, GOALS, ACHIEVEMENTS, BOT_NAMES, chooseMove, load, save, blank, isUnlocked, totalStars, recordDeal, recordStage, goalText, goalCheck, unlockAchievements };
+  /* ---------- tappe a coppie (arcade con un amico): stesso giro, obiettivi di squadra ---------- */
+  const COOP_STAGES = [
+    { id: 101, zone: 0, town: 'Ventimiglia', who: 'i pescatori', level: 0, players: 4, deals: 1, goal: ['winDeal'], bonus: ['scope', 1], intro: 'Tu e il tuo compagno contro due pescatori distratti.' },
+    { id: 102, zone: 0, town: 'Sanremo', who: 'i croupier', level: 0, players: 4, deals: 1, goal: ['scope', 2], bonus: ['settebello'], intro: 'Due scope di coppia: chi ha l\'asso lo tenga per il momento giusto.' },
+    { id: 103, zone: 0, town: 'Alassio', who: 'le bagnine', level: 1, players: 4, deals: 1, goal: ['denari'], bonus: ['primiera'], intro: 'Puntate ai denari: contano quelli presi da entrambi.' },
+    { id: 104, zone: 1, town: 'Finale', who: 'la banda della spiaggia', level: 1, players: 4, deals: 2, goal: ['margin', 3], bonus: ['noScopeAgainst'], intro: 'Vincete una smazzata di almeno 3 punti.' },
+    { id: 105, zone: 1, town: 'Savona', who: 'i camalli', level: 2, players: 4, deals: 1, goal: ['noScopeAgainst'], bonus: ['margin', 4], intro: 'I camalli calcolano tutto: non lasciate mai il tavolo scopabile.' },
+    { id: 106, zone: 1, town: 'Varazze', who: 'i marinai', level: 2, players: 4, target: 21, goal: ['winGame', 21], bonus: ['settebello'], intro: 'Partita a 21, in coppia.' },
+    { id: 107, zone: 2, town: 'Sampierdarena', who: 'i portuali', level: 2, players: 4, deals: 1, goal: ['points', 8], bonus: ['points', 11], intro: 'Otto punti di squadra in una smazzata.' },
+    { id: 108, zone: 2, town: 'Porto Antico', who: 'i mercanti', level: 2, players: 4, deals: 2, goal: ['piccola'], bonus: ['grande'], intro: 'La piccola: A-2-3 di denari, presi tra tutti e due.' },
+    { id: 109, zone: 2, town: 'Boccadasse', who: 'le nonne', level: 3, players: 4, deals: 1, goal: ['winDeal'], bonus: ['noScopeAgainst'], intro: 'Due nonne che giocano da settant\'anni. Ognuna.' },
+    { id: 110, zone: 2, town: 'Sori', who: 'i Campioni di Sori', level: 3, players: 4, target: 31, goal: ['winGame', 31], bonus: ['margin', 8], intro: 'Il boss di Genova, in due.' },
+    { id: 111, zone: 3, town: 'Recco', who: 'i fratelli della focaccia', level: 3, players: 4, deals: 2, goal: ['scope', 3], bonus: ['winDeal'], intro: 'Tre scope in una smazzata.' },
+    { id: 112, zone: 3, town: 'Camogli', who: 'i pittori', level: 3, players: 4, deals: 1, goal: ['allMazzo'], bonus: ['scope', 1], intro: 'Carte, denari, settebello e primiera insieme.' },
+    { id: 113, zone: 3, town: 'Portofino', who: 'gli yachtisti', level: 3, players: 4, target: 31, handicap: 10, goal: ['handicap', 10], bonus: ['settebello'], intro: 'Loro partono da 10.' },
+    { id: 114, zone: 3, town: 'Chiavari', who: 'i notai', level: 3, players: 4, deals: 1, goal: ['margin', 7], bonus: ['grande'], intro: 'Vincete di sette.' },
+    { id: 115, zone: 4, town: 'Sestri Levante', who: 'le sirene', level: 3, players: 4, target: 51, handicap: 15, goal: ['handicap', 15], bonus: ['noScopeAgainst'], intro: 'A 51 partendo 15 sotto.' },
+    { id: 116, zone: 4, town: 'Monterosso', who: 'i vignaioli', level: 3, players: 4, target: 51, goal: ['winGame', 51], bonus: ['piccola'], intro: 'La partita vera, fino a 51.' },
+    { id: 117, zone: 4, town: 'Portovenere', who: 'i poeti', level: 3, players: 4, deals: 3, goal: ['cappotto'], bonus: ['grande'], intro: 'Tutti i denari in una smazzata. Tre tentativi.' },
+    { id: 118, zone: 4, town: 'La Spezia', who: 'gli Ammiragli', level: 3, players: 4, target: 71, handicap: 20, goal: ['handicap', 20], bonus: ['margin', 15], intro: 'L\'ultima tappa: 71 punti, loro partono da 20.' },
+  ];
+  function stagesFor(mode) { return mode === 'coop' ? COOP_STAGES : STAGES; }
+  function isUnlockedIn(p, list, id) { const i = list.findIndex(s => s.id === id); return i === 0 || (p.stars[list[i - 1].id] || 0) >= 1; }
+  root.Arcade = { COOP_STAGES, stagesFor, isUnlockedIn, STAGES, ZONES, GOALS, ACHIEVEMENTS, BOT_NAMES, chooseMove, load, save, blank, isUnlocked, totalStars, recordDeal, recordStage, goalText, goalCheck, unlockAchievements };
 })(typeof self !== 'undefined' ? self : this);
