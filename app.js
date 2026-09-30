@@ -600,7 +600,15 @@ const Stage = {
       this.nodes.delete(key);
       const exit = spawn['exit:' + key] || spawn['exit'];
       node.dataset.key = 'gone:' + key;
-      if (exit) { node.style.transitionDelay = '0ms'; node.style.transform = `translate(${exit.x}px,${exit.y}px) rotate(${exit.rot || 0}deg) rotateY(180deg)`; node.style.opacity = '0'; setTimeout(() => node.remove(), 700); }
+      if (exit) {
+        // vola nel mazzetto: si gira sul dorso durante il volo e si adagia sulla pila
+        const k = this.pileScale();
+        node.style.transitionDelay = (exit.delay || 0) + 'ms';
+        node.style.zIndex = 4;
+        node.classList.remove('target', 'alt', 'target-dim', 'selected');
+        node.style.transform = `translate(${exit.x}px,${exit.y}px) rotate(${exit.rot || 0}deg) rotateY(180deg)${k !== 1 ? ` scale(${k})` : ''}`;
+        setTimeout(() => node.remove(), 650 + (exit.delay || 0));
+      }
       else node.remove();
     }
     // mazzo e mazzetti
@@ -863,7 +871,7 @@ const Stage = {
         this.fx(`Buona del mazziere`, `le quattro carte fanno ${ev.sum}: ${ev.points === 2 ? 'due scope' : 'una scopa'} a ${finalView.names[ev.seat]}`, 'oro');
         Sound.play('scopa');
         await sleep(1200);
-        if (sim) { const t = C.teamOf(finalView, ev.seat); sim.table = []; sim.captured[t] = ev.cards.slice(); sim.scope[t] = ev.points; sim.scopeCards[t] = ev.cards.slice(0, ev.points); this.draw(this.layout(sim), { exit: this.pilePos(t, finalView) }); await sleep(600); }
+        if (sim) { const t = C.teamOf(finalView, ev.seat); sim.table = []; sim.captured[t] = ev.cards.slice(); sim.scope[t] = ev.points; sim.scopeCards[t] = ev.cards.slice(0, ev.points); const pp = this.pilePos(t, finalView), ex = {}; ev.cards.forEach((id, i) => ex['exit:' + id] = { x: pp.x, y: pp.y - i, rot: (i % 3 - 1) * 2, delay: i * 70 }); this.draw(this.layout(sim), ex); await sleep(900); }
         break;
       }
       case 'buona': {
@@ -900,8 +908,10 @@ const Stage = {
           sim.table = sim.table.filter(x => !ev.captured.includes(x.id) && x.id !== played);
           sim.captured[t].push(...ev.captured, played);
           if (ev.scopa) { sim.scope[t]++; sim.scopeCards[t].push(played); }
-          this.draw(this.layout(sim), { exit: this.pilePos(t, finalView) });
-          await sleep(560);
+          const pp = this.pilePos(t, finalView), ex = {};
+          ev.captured.concat(played).forEach((id, i) => { ex['exit:' + id] = { x: pp.x + (i % 2 ? 1 : -1), y: pp.y - i, rot: (i % 3 - 1) * 2, delay: i * 70 }; });
+          this.draw(this.layout(sim), ex);
+          await sleep(620 + ev.captured.length * 70);
         }
         break;
       }
@@ -909,8 +919,9 @@ const Stage = {
         if (ev.leftover && ev.leftover.length && sim) {
           const t = ev.lastCapturer != null ? C.teamOf(finalView, ev.lastCapturer) : 0;
           toast(`Le carte rimaste in tavola vanno a ${finalView.names[ev.lastCapturer] || 'chi ha preso per ultimo'}`);
-          sim.table = []; this.draw(this.layout(sim), { exit: this.pilePos(t, finalView) });
-          await sleep(700);
+          const pp = this.pilePos(t, finalView), ex = {}; ev.leftover.forEach((id, i) => ex['exit:' + id] = { x: pp.x, y: pp.y - i, rot: (i % 3 - 1) * 2, delay: i * 70 });
+          sim.table = []; this.draw(this.layout(sim), ex);
+          await sleep(700 + ev.leftover.length * 70);
         }
         break;
       }
