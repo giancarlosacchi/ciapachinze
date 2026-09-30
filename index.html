@@ -21,27 +21,26 @@
     <div class="wordmark big" aria-label="Ciapachinze">c<span class="i h">ı</span>apach<span class="i d">ı</span>nze<span class="badge">15</span></div>
     <p class="tag">la cirulla genovese, online — con la voce degli amici al tavolo</p>
     <div class="home-cards">
-      <div class="panel">
+      <div class="panel open-table">
         <h2>Apri un tavolo</h2>
-        <div class="field"><label for="host-name">Il tuo nome</label><input id="host-name" maxlength="16" placeholder="es. Giancarlo" autocomplete="nickname"></div>
+        <div class="field"><label for="host-name">Il tuo nome</label><input id="host-name" maxlength="16" placeholder="es. Mario Rossi" autocomplete="nickname"></div>
         <div class="field"><label>Giocatori</label>
-          <div class="seg" id="seg-players"><button data-v="2" class="on">2 · uno contro uno</button><button data-v="4">4 · a coppie</button></div></div>
+          <div class="seg" id="seg-players"><button data-v="2" class="on">1 vs 1</button><button data-v="4">2 vs 2</button></div></div>
         <div class="field"><label>Si vince a</label>
           <div class="seg" id="seg-target"><button data-v="51" class="on">51</button><button data-v="71">71</button><button data-v="101">101</button></div></div>
-        <button id="btn-host" class="btn wide">Apri il tavolo</button>
+        <button id="btn-host" class="btn wide">Apri il tavolo online</button>
+        <button id="btn-solo" class="btn oro wide">Gioca contro il computer</button>
+        <p class="status" style="margin:8px 0 0;font-size:12px">Contro il computer giochi subito, da solo, con le stesse regole. Online inviti gli amici con un codice.</p>
       </div>
-      <div class="panel">
+      <div class="panel join-table">
         <h2>Siediti a un tavolo</h2>
-        <div class="field"><label for="join-name">Il tuo nome</label><input id="join-name" maxlength="16" placeholder="es. Marco" autocomplete="nickname"></div>
+        <div class="field"><label for="join-name">Il tuo nome</label><input id="join-name" maxlength="16" placeholder="es. Mario Rossi" autocomplete="nickname"></div>
         <div class="field"><label for="join-code">Codice del tavolo</label><input id="join-code" maxlength="6" placeholder="es. K7PZ3Q" style="text-transform:uppercase;letter-spacing:.15em"></div>
         <button id="btn-join" class="btn oro wide">Entra</button>
         <p class="status" id="join-status"></p>
       </div>
     </div>
-    <p class="home-foot">
-      <button class="linkish" id="btn-rules-home">Come si gioca</button> ·
-      <button class="linkish" id="btn-solo">Allenati contro il computer</button>
-    </p>
+    <p class="home-foot"><button class="linkish" id="btn-rules-home">Come si gioca</button></p>
   </div>
 </section>
 

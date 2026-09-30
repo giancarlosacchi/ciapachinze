@@ -69,39 +69,39 @@ const Sound = (() => {
 /* =====================================================================
    Grafica carte (SVG)
    ===================================================================== */
+const SUIT_PATH = {
+  H: 'M10 18 C4 12 1 9 1 5.5 A4.5 4.5 0 0 1 10 4 A4.5 4.5 0 0 1 19 5.5 C19 9 16 12 10 18Z',
+  D: 'M10 1 L18 10 L10 19 L2 10Z',
+  C: 'M10 2 a4 4 0 0 1 3.2 6.4 a4 4 0 1 1 -2.4 6.1 L12 19 H8 L9.2 14.5 a4 4 0 1 1 -2.4 -6.1 A4 4 0 0 1 10 2Z',
+  S: 'M10 1 C6 6 2 9 2 12.5 a4 4 0 0 0 6.8 2.9 L8 19 H12 L11.2 15.4 A4 4 0 0 0 18 12.5 C18 9 14 6 10 1Z',
+};
+const suitIcon = (s, x, y, size, col) => `<path d="${SUIT_PATH[s]}" fill="${col}" transform="translate(${x} ${y}) scale(${size / 20})"/>`;
+const FONT_NUM = "'Nunito Sans', 'Arial Black', Arial, sans-serif";
 function cardSVG(id) {
-  const r = C.rankOf(id), s = C.suitOf(id), sym = C.SUIT_SYMBOL[s], lbl = C.RANK_LABEL[r];
+  const r = C.rankOf(id), s = C.suitOf(id), lbl = C.RANK_LABEL[r];
   const red = s === 'H' || s === 'D';
   const col = red ? '#c8202f' : '#1b1a24';
-  const court = r >= 8;
   let center;
-  if (r === 1) {
-    center = `<text x="44" y="82" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="900" font-size="64" fill="${col}">${sym}</text>`;
-  } else if (court) {
-    const crown = r === 10
-      ? `<path d="M24 54 L28 34 L38 46 L44 28 L50 46 L60 34 L64 54 Z" fill="${col}"/><rect x="24" y="54" width="40" height="5" rx="1" fill="${col}"/><circle cx="28" cy="33" r="2.5" fill="#d9a621"/><circle cx="44" cy="27" r="2.5" fill="#d9a621"/><circle cx="60" cy="33" r="2.5" fill="#d9a621"/>`
-      : r === 9
-      ? `<path d="M26 56 Q30 30 44 30 Q58 30 62 56 Z" fill="${col}"/><circle cx="44" cy="30" r="3" fill="#d9a621"/><path d="M33 44 L55 44" stroke="#fbf7ee" stroke-width="2" opacity=".8"/>`
-      : `<path d="M28 56 L28 40 Q44 26 60 40 L60 56 Z" fill="${col}"/><path d="M52 32 Q64 22 66 34" stroke="#d9a621" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    center = `${crown}
-      <text x="44" y="98" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="900" font-size="54" fill="${col}">${lbl}</text>
-      <text x="44" y="112" text-anchor="middle" font-family="Nunito Sans, sans-serif" font-weight="800" font-size="10" fill="${col}" opacity=".7">vale ${r}</text>`;
+  if (r >= 8) {
+    // figure: lettera grande e, sotto, il valore di presa in chiaro
+    center = `<text x="44" y="74" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="60" fill="${col}">${lbl}</text>
+      <rect x="22" y="84" width="44" height="22" rx="11" fill="${col}"/>
+      <text x="44" y="100" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="16" fill="#fbf7ee">= ${r}</text>`;
   } else {
-    center = `<text x="44" y="78" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="900" font-size="60" fill="${col}">${r}</text>
-      <text x="44" y="108" text-anchor="middle" font-family="Segoe UI Symbol, Apple Symbols, sans-serif" font-size="26" fill="${col}">${sym}</text>`;
+    center = `<text x="44" y="80" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="68" fill="${col}">${lbl}</text>
+      ${suitIcon(s, 33, 88, 22, col)}`;
   }
   let badge = '';
-  if (id === C.SETTEBELLO) badge = `<g transform="translate(60 8)"><circle cx="10" cy="10" r="10" fill="#d9a621"/><text x="10" y="14" text-anchor="middle" font-size="12" font-weight="900" font-family="Fraunces, serif" fill="#1b1a24">★</text></g>`;
-  if (id === C.MATTA) badge = `<g transform="translate(58 6)"><path d="M2 20 L6 4 L11 12 L16 2 L22 20 Z" fill="#7fa36c"/><circle cx="6" cy="4" r="2.2" fill="#d9a621"/><circle cx="16" cy="2" r="2.2" fill="#c8202f"/></g>`;
+  if (id === C.SETTEBELLO) badge = `<g transform="translate(62 8)"><circle cx="9" cy="9" r="9" fill="#d9a621"/><path d="M9 3.5 L10.6 7.2 L14.6 7.5 L11.5 10.1 L12.5 14 L9 11.9 L5.5 14 L6.5 10.1 L3.4 7.5 L7.4 7.2Z" fill="#1b1a24"/></g>`;
+  if (id === C.MATTA) badge = `<g transform="translate(60 6)"><rect width="22" height="14" rx="7" fill="#7fa36c"/><text x="11" y="10.5" text-anchor="middle" font-family="${FONT_NUM}" font-weight="900" font-size="9" fill="#fff">MATTA</text></g>`;
   return `<svg viewBox="0 0 88 128" xmlns="http://www.w3.org/2000/svg" aria-label="${C.cardName(id)}">
-    <text x="9" y="22" font-family="Fraunces, Georgia, serif" font-weight="900" font-size="20" fill="${col}">${lbl}</text>
-    <text x="9" y="36" font-family="Segoe UI Symbol, Apple Symbols, sans-serif" font-size="13" fill="${col}">${sym}</text>
-    <g transform="rotate(180 44 64)"><text x="9" y="22" font-family="Fraunces, Georgia, serif" font-weight="900" font-size="20" fill="${col}">${lbl}</text><text x="9" y="36" font-family="Segoe UI Symbol, Apple Symbols, sans-serif" font-size="13" fill="${col}">${sym}</text></g>
+    <text x="8" y="22" font-family="${FONT_NUM}" font-weight="900" font-size="19" fill="${col}">${lbl}</text>
+    ${suitIcon(s, 7, 26, 13, col)}
     ${center}${badge}</svg>`;
 }
 function miniCard(id, extra = '') {
   const s = C.suitOf(id), red = s === 'H' || s === 'D';
-  return `<div class="mini ${red ? 'red' : ''} ${s === 'D' ? 'denari' : ''} ${extra}" title="${C.cardName(id)}">${C.RANK_LABEL[C.rankOf(id)]}<br>${C.SUIT_SYMBOL[s]}</div>`;
+  return `<div class="mini ${red ? 'red' : ''} ${s === 'D' ? 'denari' : ''} ${extra}" title="${C.cardName(id)}">${C.RANK_LABEL[C.rankOf(id)]}<svg viewBox="0 0 20 20" width="10" height="10">${suitIcon(s, 0, 0, 20, red ? '#c8202f' : '#1b1a24')}</svg></div>`;
 }
 const cardShort = id => `${C.RANK_LABEL[C.rankOf(id)]}${C.SUIT_SYMBOL[C.suitOf(id)]}`;
 
@@ -285,7 +285,7 @@ const Client = {
       case 'welcome': App.mySeat = msg.seat; App.cfg = msg.cfg; App.code = msg.code; break;
       case 'lobby': App.roster = msg.roster; App.cfg = msg.cfg; if (!msg.started) { showScreen('scr-lobby'); renderLobby(); } else renderPlayers(); Voice.rosterChanged(); break;
       case 'view': onView(msg.view, msg.roster); break;
-      case 'err': toast(msg.msg); Stage.locked = false; if (App.view) Stage.render(App.view); break;
+      case 'err': toast(msg.msg); Stage.locked = false; Stage.clearSelection(); if (App.view) Stage.render(App.view); break;
       case 'full': toast('Il tavolo è pieno'); break;
       case 'chat': Side.addChat(msg.seat, msg.text); break;
       case 'ptt': Voice.remotePtt(msg.seat, msg.on); break;
@@ -426,7 +426,7 @@ const Stage = {
     $('#mstrip').onclick = () => Side.open('prese');
     new ResizeObserver(() => { this.measure(); if (App.view) { this.render(App.view); renderPlayers(App.view); } }).observe(this.wrap);
     this.measure();
-    window.addEventListener('keydown', e => { if (e.key === 'Escape') this.clearSelection(); });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && this.selected) this.clearSelection(); });
   },
   measure() { const r = this.wrap.getBoundingClientRect(); this.W = r.width; this.H = r.height; },
   cw() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--card-w')); },
@@ -492,7 +492,13 @@ const Stage = {
       const slots = this.handSlots(rel, hand.length, view);
       hand.forEach((id, i) => {
         const key = id || `h:${s}:${i}`;
-        items.push({ key, id, face: !!id, ...slots[i], z: 10 + i, hand: s, hi: i });
+        const it = { key, id, face: !!id, ...slots[i], z: 10 + i, hand: s, hi: i };
+        if (s === App.mySeat && id === this.selected) {
+          it.z = 40;
+          if (this.floating) { const ts = this.tableSlots(Math.max(1, view.table.length)); it.x = this.W / 2 - this.cw() / 2; it.y = ts[ts.length - 1].y + this.ch() * .55; it.rot = 0; }
+          else { it.y -= 28; it.rot = 0; }
+        }
+        items.push(it);
       });
     }
     // tavolo
@@ -532,9 +538,10 @@ const Stage = {
         node.classList.toggle('red', s === 'H' || s === 'D'); node.classList.toggle('denari', s === 'D');
       }
       node.style.transitionDelay = (it.delay || 0) + 'ms';
-      node.style.transform = `translate(${it.x}px,${it.y}px) rotate(${it.rot || 0}deg) rotateY(${it.face ? 0 : 180}deg)`;
+      if (!(this.drag && this.drag.id === it.key)) node.style.transform = `translate(${it.x}px,${it.y}px) rotate(${it.rot || 0}deg) rotateY(${it.face ? 0 : 180}deg)`;
       node.style.zIndex = it.z || 2;
       node.classList.toggle('scopa-mark', !!it.scopa);
+      node.classList.toggle('selected', it.key === this.selected);
       node._it = it;
     });
     // nodi non più presenti: escono
@@ -574,11 +581,13 @@ const Stage = {
       const nc = view.captured[t].length, sc = view.scope[t];
       p.querySelector('.cnt').textContent = `${nc} cart${nc === 1 ? 'a' : 'e'}${sc ? ` · ${sc} scop${sc === 1 ? 'a' : 'e'}` : ''}`;
     }
-    const keep = this.selected && view.phase === 'play' && view.turn === App.mySeat && !view.pendingBuona && (view.hands[App.mySeat] || []).includes(this.selected);
-    const sel = this.selected;
-    this.clearSelection(false);
     this.updateInteractivity(view);
-    if (keep) this.select(sel);
+    // la selezione sopravvive a un aggiornamento solo se è ancora valida
+    if (this.selected && !this.canAct(view, this.selected)) this.clearSelection();
+    else if (this.selected) this.showOptions(this.selected);
+  },
+  canAct(view, id) {
+    return !!view && !this.locked && view.phase === 'play' && view.turn === App.mySeat && !view.pendingBuona && (view.hands[App.mySeat] || []).includes(id);
   },
   updateInteractivity(view) {
     const myTurn = view.phase === 'play' && view.turn === App.mySeat && !view.pendingBuona && !this.locked;
@@ -587,80 +596,150 @@ const Stage = {
       const it = node._it; if (!it) continue;
       const mine = it.hand === App.mySeat;
       node.classList.toggle('selectable', mine && myTurn);
-      node.classList.toggle('playable', false);
-      node.onclick = null; node.onmouseenter = null; node.onmouseleave = null;
-      if (mine) {
-        node.onclick = () => { if (myTurn) this.select(it.id); };
-      }
+      node.onclick = null; node.onpointerdown = null;
+      if (mine && myTurn) node.onpointerdown = e => this.dragStart(e, it.id);
       if (it.table != null) node.onclick = () => this.clickTable(it.table);
     }
     const hint = $('#hint');
     if (view.phase === 'play') {
       if (view.pendingBuona && !view.pendingBuona.options) { hint.textContent = `${view.names[view.pendingBuona.seat]} sta dichiarando una buona…`; hint.classList.remove('hidden'); }
-      else if (myTurn) { hint.textContent = hand.length ? 'Tocca a te: scegli una carta' : ''; hint.classList.remove('hidden'); }
+      else if (myTurn) { hint.textContent = hand.length ? 'Tocca a te: trascina una carta in tavola' : ''; hint.classList.remove('hidden'); }
       else { hint.textContent = `Tocca a ${view.names[view.turn] || ''}`; hint.classList.remove('hidden'); }
       hint.style.top = (this.seatAnchor(0, view).y - this.ch() / 2 - 30) + 'px';
     } else hint.classList.add('hidden');
   },
-  select(id) {
+  optionsOf(id) {
     const view = App.view;
-    if (this.locked || !view || view.phase !== 'play' || view.turn !== App.mySeat || view.pendingBuona || !(view.hands[App.mySeat] || []).includes(id)) return;
-    if (this.selected === id) { // secondo tocco: gioca se non ambiguo
-      const opts = this.currentOptions;
-      if (opts.length <= 1) return this.play(id, opts.length ? opts[0].idx : null);
-      toast('Scegli quali carte prendere'); return;
-    }
-    this.clearSelection(false);
-    this.selected = id;
     const val = view.mattaVal && id === C.MATTA ? view.mattaVal : C.rankOf(id);
-    const opts = C.captureOptions(view.table, val);
-    this.currentOptions = opts;
-    const node = this.nodes.get(id); if (node) { node.classList.add('selected'); node.style.transform = node.style.transform.replace(/translate\(([^,]+),([^)]+)\)/, (m, x, y) => `translate(${x},${parseFloat(y) - 26}px)`); }
+    return C.captureOptions(view.table, val);
+  },
+  /* ---------- tocco: seleziona / deseleziona ---------- */
+  select(id) {
+    if (!this.canAct(App.view, id)) return;
+    if (this.selected === id) { this.clearSelection(); return; }
+    this.selected = id; this.floating = false;
+    this.draw(this.layout(App.view));
+    this.showOptions(id);
+  },
+  /* mostra chip e bagliori per la carta indicata (non tocca la posizione delle carte) */
+  showOptions(id) {
+    const view = App.view;
+    const opts = this.optionsOf(id);
+    this.currentOptions = opts; this.focused = null;
     const ch = $('#choices'); ch.innerHTML = '';
     const describe = o => o.idx.map(i => cardShort(view.table[i].id)).join(' + ');
     if (!opts.length) {
-      ch.innerHTML = `<button class="choice none">Nessuna presa: lascia in tavola ${cardShort(id)}</button>`;
+      ch.innerHTML = `<button class="choice none">Nessuna presa: lascia ${cardShort(id)} in tavola</button>`;
       ch.firstChild.onclick = () => this.play(id, null);
     } else {
       opts.forEach((o, i) => {
-        const b = document.createElement('button'); b.className = 'choice';
+        const b = document.createElement('button'); b.className = 'choice'; b.dataset.i = i;
         const kind = o.kind === 'ace' ? 'asso piglia tutto' : o.kind === 'fifteen' ? 'fa 15' : 'presa';
         b.innerHTML = `<span class="k ${o.kind}">${kind}</span>${describe(o)}${o.scopa ? ' <b>· scopa!</b>' : ''}`;
-        b.onmouseenter = () => this.highlight(o, true); b.onmouseleave = () => this.highlight(null);
+        b.onmouseenter = () => this.focus(i); b.onmouseleave = () => this.focus(null);
         b.onclick = () => this.play(id, o.idx);
         ch.appendChild(b);
       });
-      this.highlight(opts.length === 1 ? opts[0] : null, opts.length === 1);
-      if (opts.length > 1) opts.forEach(o => o.idx.forEach(i => this.nodes.get(view.table[i].id)?.classList.add('target', 'alt')));
     }
+    this.focus(opts.length === 1 ? 0 : null);
     ch.classList.remove('hidden');
-    ch.style.top = (this.seatAnchor(0, view).y - this.ch() / 2 - 62) + 'px';
+    const slots = this.tableSlots(Math.max(1, view.table.length));
+    ch.style.top = Math.max(8, slots[0].y - 54) + 'px';
     $('#hint').classList.add('hidden');
   },
-  highlight(o, strong) {
-    const view = App.view;
-    view.table.forEach((t, i) => { const n = this.nodes.get(t.id); if (!n) return; n.classList.remove('target', 'alt', 'target-dim'); });
-    if (!o) { if (this.currentOptions && this.currentOptions.length > 1) this.currentOptions.forEach(x => x.idx.forEach(i => this.nodes.get(view.table[i].id)?.classList.add('target', 'alt'))); return; }
-    view.table.forEach((t, i) => { const n = this.nodes.get(t.id); if (!n) return; if (o.idx.includes(i)) n.classList.add('target'); else n.classList.add('target-dim'); });
+  /* evidenzia l'opzione i (o tutte le possibili se null) */
+  focus(i) {
+    const view = App.view; const opts = this.currentOptions || [];
+    this.focused = i;
+    $$('#choices .choice').forEach(b => b.classList.toggle('hl', b.dataset.i == i));
+    view.table.forEach((t, k) => {
+      const n = this.nodes.get(t.id); if (!n) return;
+      n.classList.remove('target', 'alt', 'target-dim');
+      if (i != null && opts[i]) { if (opts[i].idx.includes(k)) n.classList.add('target'); else n.classList.add('target-dim'); }
+      else if (opts.length > 1 && opts.some(o => o.idx.includes(k))) n.classList.add('target', 'alt');
+    });
   },
-  clickTable(i) {
+  clickTable(k) {
     if (!this.selected) return;
-    const opts = this.currentOptions.filter(o => o.idx.includes(i));
-    if (opts.length === 1) this.play(this.selected, opts[0].idx);
-    else if (opts.length > 1) { toast('Più prese possibili con questa carta: scegline una qui sopra'); }
+    const hits = this.currentOptions.map((o, i) => o.idx.includes(k) ? i : -1).filter(i => i >= 0);
+    if (hits.length === 1) this.play(this.selected, this.currentOptions[hits[0]].idx);
+    else if (hits.length > 1) { this.focus(hits[0]); toast('Questa carta rientra in più prese: scegline una'); }
   },
-  clearSelection(rerender = true) {
-    if (this.selected) { const n = this.nodes.get(this.selected); if (n) { n.classList.remove('selected'); if (rerender && App.view) this.render(App.view); } }
-    this.selected = null; this.currentOptions = [];
+  clearSelection() {
+    const had = this.selected;
+    this.selected = null; this.floating = false; this.currentOptions = []; this.focused = null;
     $('#choices').classList.add('hidden');
-    if (App.view) App.view.table.forEach(t => this.nodes.get(t.id)?.classList.remove('target', 'alt', 'target-dim'));
-    if (App.view && !rerender) $('#hint').classList.remove('hidden');
+    if (App.view) {
+      App.view.table.forEach(t => this.nodes.get(t.id)?.classList.remove('target', 'alt', 'target-dim'));
+      if (had) this.draw(this.layout(App.view));
+      if (App.view.phase === 'play') $('#hint').classList.remove('hidden');
+    }
   },
   play(id, idx) {
     if (this.locked) return;
     this.locked = true;
-    Stage.clearSelection(false);
+    this.clearSelection();
     Client.send({ t: 'play', card: id, idx });
+    clearTimeout(this.unlockTimer);
+    this.unlockTimer = setTimeout(() => { if (this.locked && !queue.length && !processing) { this.locked = false; if (App.view) this.render(App.view); } }, 6000);
+  },
+  /* ---------- trascinamento ---------- */
+  dragStart(e, id) {
+    if (!this.canAct(App.view, id) || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    const node = this.nodes.get(id); if (!node) return;
+    const it = node._it;
+    const drag = { id, node, x0: e.clientX, y0: e.clientY, ox: it.x, oy: it.y, moved: false, over: false };
+    this.drag = drag;
+    node.setPointerCapture(e.pointerId);
+    const move = ev => {
+      const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
+      if (!drag.moved) {
+        if (Math.hypot(dx, dy) < 8) return;
+        drag.moved = true;
+        if (this.selected && this.selected !== id) this.clearSelection();
+        this.selected = id; this.floating = false;
+        node.classList.add('dragging'); node.style.zIndex = 60;
+        this.showOptions(id);
+      }
+      node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy}px) rotate(0deg) rotateY(0deg) scale(1.06)`;
+      const handTop = this.seatAnchor(0, App.view).y - this.ch() / 2 - 24;
+      const r = this.wrap.getBoundingClientRect();
+      drag.over = (ev.clientY - r.top) < handTop;
+      node.classList.toggle('over-table', drag.over);
+      // cosa c'è sotto il dito?
+      const under = (document.elementsFromPoint(ev.clientX, ev.clientY) || []).find(el => !node.contains(el)) || null;
+      const chip = under && under.closest('.choice');
+      const card = under && under.closest('.card');
+      let f = null;
+      if (chip && chip.dataset.i != null) f = +chip.dataset.i;
+      else if (card && card._it && card._it.table != null) {
+        const k = card._it.table; const hits = this.currentOptions.map((o, i) => o.idx.includes(k) ? i : -1).filter(i => i >= 0);
+        if (hits.length) f = hits[0];
+      }
+      if (f !== this.focused) this.focus(f ?? (this.currentOptions.length === 1 ? 0 : null));
+    };
+    const cancel = ev => { drag.over = false; end(ev); };
+    const end = ev => {
+      node.removeEventListener('pointermove', move); node.removeEventListener('pointerup', end); node.removeEventListener('pointercancel', cancel);
+      try { node.releasePointerCapture(ev.pointerId); } catch (x) {}
+      node.classList.remove('dragging', 'over-table'); node.style.zIndex = it.z || 2;
+      this.drag = null;
+      if (!drag.moved) { this.select(id); return; }                 // era un tocco
+      const opts = this.currentOptions || [];
+      if (drag.over) {
+        if (this.focused != null && opts[this.focused]) return this.play(id, opts[this.focused].idx);
+        if (opts.length === 0) return this.play(id, null);
+        if (opts.length === 1) return this.play(id, opts[0].idx);
+        // più prese possibili: la carta resta sospesa in tavola finché non scegli
+        this.floating = true;
+        this.draw(this.layout(App.view));
+        toast('Scegli quale presa fare');
+        return;
+      }
+      this.clearSelection();                                        // rimessa in mano
+    };
+    node.addEventListener('pointermove', move); node.addEventListener('pointerup', end); node.addEventListener('pointercancel', cancel);
   },
   /* ---------- animazione di un evento ---------- */
   async animateEvent(ev, sim, finalView) {
