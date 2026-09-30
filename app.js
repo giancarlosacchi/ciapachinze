@@ -692,15 +692,17 @@ const Stage = {
     const svg = $('#dropzone'); if (!on) { svg.classList.add('hidden'); return; }
     const a = this.arc();
     svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
-    const path = $('#drop-path'), fill = $('#drop-fill');
-    path.setAttribute('d', a.d);
+    const path = $('#drop-path'), solid = $('#drop-solid'), fill = $('#drop-fill');
+    path.setAttribute('d', a.d); solid.setAttribute('d', a.d);
     fill.setAttribute('d', `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`);
     p = clamp(p || 0, 0, 1);
-    path.style.strokeDasharray = `${10 + 30 * p} ${9 * (1 - p)}`;
-    path.style.strokeWidth = (3 + 2.5 * p).toFixed(2);
-    path.style.stroke = `rgba(127,163,108,${(.6 + .4 * p).toFixed(2)})`;
-    path.style.filter = p > .6 ? `drop-shadow(0 0 ${(8 * (p - .6) / .4).toFixed(1)}px rgba(127,163,108,.8))` : 'none';
-    fill.style.fill = `rgba(127,163,108,${(.05 + .12 * p).toFixed(3)})`;
+    const e = p * p * (3 - 2 * p);   // curva morbida
+    // la linea piena si sovrappone a quella tratteggiata e affiora gradualmente
+    solid.style.opacity = e.toFixed(3);
+    solid.style.strokeWidth = (3 + 2.5 * e).toFixed(2);
+    solid.style.filter = e > .5 ? `drop-shadow(0 0 ${(10 * (e - .5) / .5).toFixed(1)}px rgba(190,230,170,.9))` : 'none';
+    path.style.opacity = (1 - .6 * e).toFixed(3);
+    fill.style.fill = `rgba(190,230,170,${(.04 + .12 * e).toFixed(3)})`;
     svg.classList.remove('hidden');
   },
   /* quanto la carta si è avvicinata alla linea: 0 vicino alla mano, 1 sulla linea o oltre */

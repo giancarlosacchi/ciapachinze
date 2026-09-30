@@ -1,9 +1,9 @@
 /* Ciapachinze — stile. Palette ligure: ardesia, avorio, rosso San Giorgio, oro dei denari. */
 :root {
-  --ardesia: #1e2a33;
-  --ardesia-2: #27363f;
-  --ardesia-3: #33454f;
-  --ardesia-edge: #142028;
+  --ardesia: #16241f;      /* fondo pagina, verde scurissimo */
+  --ardesia-2: #245a41;    /* panno del tavolo */
+  --ardesia-3: #2d6d4f;    /* centro del panno */
+  --ardesia-edge: #153c2b; /* bordo del tavolo */
   --avorio: #f6f0e1;
   --avorio-2: #e9e0cb;
   --carta: #fbf7ee;
@@ -231,7 +231,7 @@ input { font: inherit; }
 /* modali */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 50; padding: 16px; backdrop-filter: blur(4px); animation: fadein .25s; }
 @keyframes fadein { from { opacity: 0; } }
-.modal { background: var(--ardesia-2); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 22px; width: min(560px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: pop .35s var(--ease); }
+.modal { background: #1f302a; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 22px; width: min(560px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: pop .35s var(--ease); }
 @keyframes pop { from { transform: scale(.94) translateY(10px); opacity: 0; } }
 .modal h2 { font-family: var(--font-display); font-weight: 700; margin: 0 0 6px; font-size: 26px; color: var(--avorio); }
 .modal h2 small { display: block; font-size: 14px; color: var(--testo-2); font-weight: 400; font-style: italic; margin-top: 2px; }
@@ -309,8 +309,9 @@ input { font: inherit; }
 
 /* arco mano/campo, scritta curva, riquadro di scelta */
 .dropzone, .hintarc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
-.dropzone #drop-fill { fill: rgba(127,163,108,.07); transition: fill .2s; }
-.dropzone #drop-path { fill: none; stroke: rgba(127,163,108,.6); stroke-width: 3; stroke-dasharray: 10 9; stroke-linecap: round; transition: stroke .15s, stroke-width .15s, stroke-dasharray .15s; }
+.dropzone #drop-fill { fill: rgba(190,230,170,.05); transition: fill .1s linear; }
+.dropzone #drop-path { fill: none; stroke: rgba(190,230,170,.7); stroke-width: 3; stroke-dasharray: 10 9; stroke-linecap: round; }
+.dropzone #drop-solid { fill: none; stroke: #bfe6a8; stroke-width: 3; stroke-linecap: round; opacity: 0; transition: opacity .08s linear, stroke-width .08s linear; }
 .hintarc text { fill: var(--testo-2); font-family: var(--font-display); font-style: italic; font-size: 15px; letter-spacing: .04em; }
 .chooser { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; background: rgba(12,20,26,.96); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; width: min(360px, 92%); box-shadow: 0 30px 70px rgba(0,0,0,.6); backdrop-filter: blur(10px); animation: pop .25s var(--ease); }
 .chooser .ch-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--avorio); margin-bottom: 4px; }
