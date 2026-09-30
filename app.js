@@ -77,10 +77,32 @@ const SUIT_PATH = {
 };
 const suitIcon = (s, x, y, size, col) => `<path d="${SUIT_PATH[s]}" fill="${col}" transform="translate(${x} ${y}) scale(${size / 20})"/>`;
 const FONT_NUM = "'Nunito Sans', 'Arial Black', Arial, sans-serif";
+const Record = {
+  key: 'cpz-record',
+  load() { try { return JSON.parse(localStorage.getItem(this.key) || '{}'); } catch (e) { return {}; } },
+  save(r) { try { localStorage.setItem(this.key, JSON.stringify(r)); } catch (e) {} },
+  norm: n => String(n || '').replace(/\s*\(pc\)/, '').trim().toLowerCase(),
+  add(opponents, won) {
+    const r = this.load(); const k = opponents.map(this.norm).sort().join(' & ');
+    if (!k) return null;
+    r[k] = r[k] || { name: opponents.map(n => String(n).replace(/\s*\(pc\)/, '')).join(' & '), w: 0, l: 0 };
+    if (won) r[k].w++; else r[k].l++;
+    this.save(r); return r[k];
+  },
+  get(opponents) { const r = this.load(); return r[opponents.map(this.norm).sort().join(' & ')] || null; },
+};
+const Settings = {
+  get fourColor() { try { return localStorage.getItem('cpz-4col') === 'on'; } catch (e) { return false; } },
+  set fourColor(v) { try { localStorage.setItem('cpz-4col', v ? 'on' : 'off'); } catch (e) {} },
+};
+// colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
+function suitColor(s) {
+  if (Settings.fourColor) return { H: '#c8202f', D: '#1f5fbf', C: '#1f8a3c', S: '#1b1a24' }[s];
+  return (s === 'H' || s === 'D') ? '#c8202f' : '#1b1a24';
+}
 function cardSVG(id, mattaVal) {
   const r = C.rankOf(id), s = C.suitOf(id), lbl = C.RANK_LABEL[r];
-  const red = s === 'H' || s === 'D';
-  const col = red ? '#c8202f' : '#1b1a24';
+  const col = suitColor(s);
   let center;
   if (r >= 8) {
     // figure: lettera grande e, sotto, il valore di presa in chiaro
@@ -100,8 +122,8 @@ function cardSVG(id, mattaVal) {
     ${center}${badge}</svg>`;
 }
 function miniCard(id, extra = '') {
-  const s = C.suitOf(id), red = s === 'H' || s === 'D';
-  return `<div class="mini ${red ? 'red' : ''} ${s === 'D' ? 'denari' : ''} ${extra}" title="${C.cardName(id)}">${C.RANK_LABEL[C.rankOf(id)]}<svg viewBox="0 0 20 20" width="10" height="10">${suitIcon(s, 0, 0, 20, red ? '#c8202f' : '#1b1a24')}</svg></div>`;
+  const s = C.suitOf(id), col = suitColor(s);
+  return `<div class="mini ${s === 'D' ? 'denari' : ''} ${extra}" style="color:${col}" title="${C.cardName(id)}">${C.RANK_LABEL[C.rankOf(id)]}<svg viewBox="0 0 20 20" width="10" height="10">${suitIcon(s, 0, 0, 20, col)}</svg></div>`;
 }
 const cardShort = id => `${C.RANK_LABEL[C.rankOf(id)]}${C.SUIT_SYMBOL[C.suitOf(id)]}`;
 
@@ -294,7 +316,7 @@ const Client = {
       case 'call-accept': Voice.onAccept(msg.seat); break;
       case 'call-decline': Voice.onDecline(msg.seat); break;
       case 'call-end': Voice.onEnd(msg.seat); break;
-      case 'bye': toast('Il tavolo è stato chiuso'); location.hash = ''; setTimeout(() => location.reload(), 1500); break;
+      case 'bye': toast('Il tavolo è stato chiuso'); Session.clear(); location.hash = ''; setTimeout(() => location.reload(), 1500); break;
     }
   },
 };
@@ -306,16 +328,21 @@ function makePeer(id) {
   const p = new Peer(id, { config: ICE, debug: 1 });
   return p;
 }
-async function hostRoom(cfg, name, solo) {
+const Session = {
+  save() { try { if (App.mode === 'host' || App.mode === 'guest') localStorage.setItem('cpz-session', JSON.stringify({ mode: App.mode, code: App.code, name: App.myName, cfg: App.cfg, at: Date.now() })); } catch (e) {} },
+  load() { try { const s = JSON.parse(localStorage.getItem('cpz-session') || 'null'); return s && Date.now() - s.at < 6 * 3600e3 ? s : null; } catch (e) { return null; } },
+  clear() { try { localStorage.removeItem('cpz-session'); } catch (e) {} },
+};
+async function hostRoom(cfg, name, solo, reuseCode) {
   App.mode = solo ? 'solo' : 'host'; App.myName = name; App.mySeat = 0; App.cfg = cfg;
   Host.init(cfg, name, solo);
   if (solo) { App.code = 'LOCALE'; App.roster = Host.roster(); Host.startGame(); return; }
-  App.code = genCode();
+  App.code = reuseCode || genCode();
   $('#lobby-code').textContent = App.code;
   $('#lobby-status').textContent = 'Connessione al servizio…';
   showScreen('scr-lobby');
   App.peer = makePeer('cpz-' + App.code);
-  App.peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(App.peer); });
+  App.peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(App.peer); Session.save(); });
   App.peer.on('connection', conn => Host.onConnection(conn));
   App.peer.on('error', e => {
     if (e.type === 'unavailable-id') { App.code = genCode(); $('#lobby-code').textContent = App.code; App.peer.destroy(); hostRoom(cfg, name); }
@@ -340,9 +367,9 @@ function joinRoom(code, name) {
   function connectToHost() {
     const conn = App.peer.connect('cpz-' + code, { reliable: true, metadata: { name } });
     App.hostConn = conn;
-    conn.on('open', () => { tries = 0; st.textContent = ''; conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); });
+    conn.on('open', () => { tries = 0; st.textContent = ''; conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
     conn.on('data', msg => Client.receive(msg));
-    conn.on('close', () => { toast('Connessione persa, riprovo…'); if (tries++ < 8) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi al tavolo'); });
+    conn.on('close', () => { toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi: riapri il link del tavolo'); });
     conn.on('error', () => {});
   }
 }
@@ -365,6 +392,9 @@ function renderLobby() {
     }
     seats.appendChild(d);
   }
+  const opp = App.roster.filter(p => p.seat !== App.mySeat && (n === 2 || (p.seat % 2) !== (App.mySeat % 2))).map(p => p.name);
+  const rec = opp.length ? Record.get(opp) : null;
+  $('#lobby-record').textContent = rec ? `Precedenti con ${rec.name}: ${rec.w} vinte · ${rec.l} perse` : '';
   const full = App.roster.length >= n && App.roster.every(p => p.online);
   $('#btn-start').disabled = !(App.mode === 'host' && full);
   $('#btn-start').classList.toggle('hidden', App.mode !== 'host');
@@ -471,7 +501,7 @@ const Stage = {
     // il mazzetto sta sempre alla sinistra di chi ha preso: il mio in basso a sinistra, il loro a destra delle loro carte
     if (this.mobile) {
       const top = this.seatAnchor(view.cfg.players === 4 ? 1 : 1, view);
-      return team === my ? { x: 6, y: this.H - ch * k - 52 } : { x: this.W - cw * k - 8, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
+      return team === my ? { x: 6, y: this.H - ch * k - 52 } : { x: this.W - cw * k - 30, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
     }
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
@@ -532,7 +562,9 @@ const Stage = {
       const pp = this.pilePos(t, view), k = this.pileScale(), cw = this.cw(), ch = this.ch();
       // le scope spuntano da sotto il mazzetto: si vede solo un angolo
       // le scope spuntano verso l'alto, ben strette: anche con molte scope non escono dall'angolo del mazzetto
-      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + cw * k * .18 + Math.min(i, 8) * 1.5, y: pp.y - ch * k * .26 - Math.min(i, 8) * 3, rot: 8 + (i % 3) * 3, z: 1, scale: k, scopa: true }));
+      // le scope spuntano da sotto: verso l'interno del campo per il mazzetto avversario, mai oltre il bordo
+      const theirs = t !== C.teamOf(view, App.mySeat);
+      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + (theirs ? -cw * k * .22 - Math.min(i, 8) * 1.5 : cw * k * .18 + Math.min(i, 8) * 1.5), y: pp.y - ch * k * .26 - Math.min(i, 8) * 3, rot: theirs ? -8 - (i % 3) * 3 : 8 + (i % 3) * 3, z: 1, scale: k, scopa: true }));
     }
     return items;
   },
@@ -590,7 +622,7 @@ const Stage = {
         node.classList.remove('no-anim');
         this.nodes.set(it.key, node);
       }
-      const faceKey = it.id ? it.id + ':' + (it.id === C.MATTA && App.view && App.view.mattaVal ? App.view.mattaVal : '') : '';
+      const faceKey = it.id ? it.id + ':' + (it.id === C.MATTA && App.view && App.view.mattaVal ? App.view.mattaVal : '') + (Settings.fourColor ? ':4' : '') : '';
       if (it.id && node.dataset.face !== faceKey) {
         node.dataset.id = it.id; node.dataset.face = faceKey;
         node.querySelector('.face').innerHTML = cardSVG(it.id, it.id === C.MATTA && App.view ? App.view.mattaVal : null);
@@ -640,10 +672,10 @@ const Stage = {
       const p = $('#pile' + t), pp = this.pilePos(t, view);
       p.style.left = pp.x + 'px'; p.style.top = pp.y + 'px';
       const nc = view.captured[t].length, sc = view.scope[t];
-      p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '');
+      p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '') + (t === my ? '' : ' theirs');
       p.style.transform = `scale(${this.pileScale()})`;
       p.querySelector('.lbl').textContent = nc ? '' : (t === my ? (view.cfg.players === 4 ? 'le nostre prese' : 'le tue prese') : (view.cfg.players === 4 ? 'le loro prese' : 'le sue prese'));
-      p.querySelector('.cnt').textContent = nc ? nc : '';
+      p.querySelector('.cnt').textContent = '';
       p.title = `${nc} cart${nc === 1 ? 'a' : 'e'}${sc ? ` · ${sc} scop${sc === 1 ? 'a' : 'e'}` : ''}`;
     }
     this.updateInteractivity(view);
@@ -1047,8 +1079,14 @@ function showDealEnd(view) {
     <div class="actions"><button class="btn ghost" id="end-prese">Vedi le carte prese</button>
     ${gameOver ? `<button class="btn" id="end-again">Nuova partita</button>` : `<button class="btn" id="end-next">${App.mode === 'guest' ? 'Pronto per la prossima' : 'Prossima smazzata'}</button>`}</div>`;
   const m = modal(html, { closable: false }); m.id = 'end-modal';
+  m.querySelector('.modal').classList.add(gameOver ? (iWon ? 'won' : 'lost') : 'deal');
+  if (gameOver && App.mode !== 'solo') {
+    const opp = view.teams[ot].map(sIdx => view.names[sIdx]);
+    const rec = Record.add(opp, iWon);
+    if (rec) { const p = document.createElement('p'); p.className = 'record'; p.innerHTML = `Con <b>${esc(rec.name)}</b>: ${rec.w} vint${rec.w === 1 ? 'a' : 'e'} · ${rec.l} pers${rec.l === 1 ? 'a' : 'e'}`; m.querySelector('.actions').before(p); }
+  }
   Sound.play(gameOver ? (iWon ? 'win' : 'lose') : (d.teams[my].total >= d.teams[ot].total ? 'take' : 'card'));
-  if (gameOver && iWon) Stage.sparks();
+  if (gameOver && iWon) { Stage.sparks(); setTimeout(() => Stage.sparks(), 700); }
   m.querySelector('#end-prese').onclick = () => { m.classList.add('hidden'); Stage.reviewCaptured(true); };
   m.querySelector('#end-prese').title = 'Si possono guardare solo a fine smazzata';
   $('#review-close').onclick = () => { Stage.reviewCaptured(false); m.classList.remove('hidden'); };
@@ -1243,9 +1281,31 @@ $('#btn-solo').onclick = () => { const name = $('#host-name').value.trim() || $(
 $('#btn-join').onclick = () => { const name = $('#join-name').value.trim() || 'Ospite'; const code = $('#join-code').value.trim().toUpperCase(); if (!/^[A-Z0-9]{6}$/.test(code)) { $('#join-status').textContent = 'Inserisci il codice di 6 caratteri.'; return; } localStorage.setItem('cpz-name', name); joinRoom(code, name); };
 $('#join-code').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-join').click(); });
 $('#btn-rules-home').onclick = () => modal(RULES_HTML);
-$('#btn-rules').onclick = () => modal(RULES_HTML);
+$('#btn-settings-home').onclick = () => openSettings();
+$('#btn-rules').onclick = () => openSettings();
+function openSettings() {
+  const m = modal(`<h2>Impostazioni</h2>
+    <label class="opt"><input type="checkbox" id="opt-4col" ${Settings.fourColor ? 'checked' : ''}> <span><b>Carte a quattro colori</b><br><small>♥ rosso, ♦ blu, ♣ verde, ♠ nero: i semi si riconoscono al volo</small></span></label>
+    <label class="opt"><input type="checkbox" id="opt-sound" ${Sound.on ? 'checked' : ''}> <span><b>Suoni</b></span></label>
+    <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" onclick="this.closest('.modal-bg').remove()">Chiudi</button></div>`);
+  m.querySelector('#opt-4col').onchange = e => { Settings.fourColor = e.target.checked; if (App.view) { Stage.nodes.forEach(n => { n.dataset.face = ''; }); Stage.render(App.view); } };
+  m.querySelector('#opt-sound').onchange = e => { Sound.on = e.target.checked; };
+  m.querySelector('#opt-rules').onclick = () => { m.remove(); modal(RULES_HTML); };
+}
 $('#btn-start').onclick = () => { if (App.mode === 'host') Host.startGame(); };
-$('#btn-leave-lobby').onclick = () => { if (App.mode === 'host') Host.broadcast({ t: 'bye' }); location.hash = ''; location.reload(); };
+$('#btn-leave-lobby').onclick = () => { if (App.mode === 'host') Host.broadcast({ t: 'bye' }); Session.clear(); location.hash = ''; location.reload(); };
+// rientro automatico: se avevo un tavolo aperto (o ero seduto) e riapro la pagina, torno al mio posto con lo stesso codice
+(() => {
+  const prev = Session.load();
+  if (!prev) return;
+  const wantCode = hashCode || prev.code;
+  if (wantCode !== prev.code) return;
+  const bar = document.createElement('div'); bar.className = 'resume';
+  bar.innerHTML = `<span>Eri al tavolo <b>${esc(prev.code)}</b> come <b>${esc(prev.name)}</b>.</span><button class="btn sm oro" id="resume-yes">Rientra</button><button class="btn sm ghost" id="resume-no">No</button>`;
+  $('#scr-home .home').prepend(bar);
+  bar.querySelector('#resume-no').onclick = () => { Session.clear(); bar.remove(); };
+  bar.querySelector('#resume-yes').onclick = () => { bar.remove(); if (prev.mode === 'host') hostRoom(prev.cfg, prev.name, false, prev.code); else joinRoom(prev.code, prev.name); };
+})();
 const inviteLink = () => location.origin + location.pathname + '#' + App.code;
 $('#btn-copy-code').onclick = () => navigator.clipboard.writeText(App.code).then(() => toast('Codice copiato'));
 $('#btn-copy-link').onclick = () => navigator.clipboard.writeText(inviteLink()).then(() => toast('Link copiato: mandalo agli amici'));
@@ -1255,8 +1315,7 @@ $('#btn-side-close').onclick = () => Side.close();
 $$('.tabs button').forEach(b => b.onclick = () => Side.setTab(b.dataset.tab));
 $('#chat-send').onclick = () => { const i = $('#chat-input'); const t = i.value.trim(); if (!t) return; Client.send({ t: 'chat', text: t }); i.value = ''; };
 $('#chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#chat-send').click(); e.stopPropagation(); });
-$('#btn-sound').onclick = () => { Sound.on = !Sound.on; $('#btn-sound').textContent = Sound.on ? '🔔' : '🔕'; };
-$('#btn-sound').textContent = Sound.on ? '🔔' : '🔕';
+$('#btn-sound').onclick = () => openSettings();
 $('#btn-call').onclick = () => Voice.startCall();
 
 $('#btn-mute').onclick = () => { Voice.muted = !Voice.muted; Voice.applyTrackState(); if (!Voice.stream) Voice.ui(); };
