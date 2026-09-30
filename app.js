@@ -166,7 +166,19 @@ const Host = {
     this.addPlayer({ name, token, peerId: null, online: true, bot: false, local: true });
     if (solo) for (let i = 1; i < cfg.players; i++) this.addPlayer({ name: ['Bacci', 'Rina', 'Tugnin'][i - 1] + ' (pc)', token: 'bot' + i, peerId: null, online: true, bot: true });
   },
-  addPlayer(p) { p.seat = this.players.length; this.players.push(p); return p; },
+  addPlayer(p, seat) {
+    if (seat == null) { seat = 0; while (this.players.some(x => x.seat === seat)) seat++; }
+    p.seat = seat; this.players.push(p); this.players.sort((a, b) => a.seat - b.seat); return p;
+  },
+  isLocal(seat) { const p = this.players.find(x => x.seat === seat); return !!(p && p.local); },
+  removeBot(seat) { const i = this.players.findIndex(p => p.seat === seat && p.bot); if (i >= 0) { this.players.splice(i, 1); this.broadcastLobby(); } },
+  addBot(seat) {
+    if (this.started || seat < 0 || seat >= this.cfg.players || this.players.some(p => p.seat === seat)) return;
+    const used = new Set(this.players.map(p => p.name));
+    const name = ['Bacci', 'Rina', 'Tugnin', 'Ciccio'].map(n => n + ' (pc)').find(n => !used.has(n)) || 'Pc (pc)';
+    this.addPlayer({ name, token: 'bot' + seat + Date.now(), peerId: null, online: true, bot: true }, seat);
+    this.broadcastLobby();
+  },
   roster() { return this.players.map(p => ({ seat: p.seat, name: p.name, online: p.online, peerId: p.peerId, bot: p.bot })); },
   teamName(t) { return this.players.filter(p => C.teamOf(this.game, p.seat) === t).map(p => p.name.replace(/ \(pc\)/, '')).join(' & '); },
   onConnection(conn) {
@@ -179,6 +191,7 @@ const Host = {
       let p = this.players.find(x => x.token === msg.token);
       if (p) { p.online = true; p.peerId = conn.peer; p.name = msg.name || p.name; }
       else if (this.players.length < this.cfg.players && !this.started) p = this.addPlayer({ name: msg.name || 'Ospite', token: msg.token, peerId: conn.peer, online: true, bot: false });
+      else if (!this.started && this.players.some(x => x.bot)) { const bot = this.players.find(x => x.bot); this.players.splice(this.players.indexOf(bot), 1); p = this.addPlayer({ name: msg.name || 'Ospite', token: msg.token, peerId: conn.peer, online: true, bot: false }, bot.seat); }
       else { conn.send({ t: 'full' }); return; }
       this.conns.set(p.seat, conn); conn.seat = p.seat;
       conn.send({ t: 'welcome', seat: p.seat, cfg: this.cfg, code: App.code });
@@ -214,21 +227,26 @@ const Host = {
       case 'chat': this.broadcast({ t: 'chat', seat, text: String(msg.text).slice(0, 200) }); break;
       case 'ptt': this.broadcast({ t: 'ptt', seat, on: !!msg.on }); break;
       case 'call-invite': case 'call-accept': case 'call-decline': case 'call-end': this.broadcast({ t: msg.t, seat }); break;
-      case 'swap': if (seat === 0 && !this.started) this.swapSeats(msg.a, msg.b); break;
+      case 'swap': if (this.isLocal(seat) && !this.started) this.swapSeats(msg.a, msg.b); break;
+      case 'addbot': if (this.isLocal(seat)) this.addBot(msg.seat); break;
+      case 'rmbot': if (this.isLocal(seat) && !this.started) this.removeBot(msg.seat); break;
     }
   },
   swapSeats(a, b) {
-    const pa = this.players[a], pb = this.players[b]; if (!pa || !pb) return;
-    this.players[a] = pb; this.players[b] = pa; pa.seat = b; pb.seat = a;
+    if (a === b || a < 0 || b < 0 || a >= this.cfg.players || b >= this.cfg.players) return;
+    const pa = this.players.find(p => p.seat === a), pb = this.players.find(p => p.seat === b);
+    if (!pa && !pb) return;
+    if (pa) pa.seat = b; if (pb) pb.seat = a;
+    this.players.sort((x, y) => x.seat - y.seat);
     const ca = this.conns.get(a), cb = this.conns.get(b);
     this.conns.delete(a); this.conns.delete(b);
     if (ca) { this.conns.set(b, ca); ca.seat = b; } if (cb) { this.conns.set(a, cb); cb.seat = a; }
     this.players.forEach(p => { if (!p.local && !p.bot) this.sendTo(p.seat, { t: 'welcome', seat: p.seat, cfg: this.cfg, code: App.code }); });
-    if (this.players[0].local) App.mySeat = 0; else App.mySeat = this.players.find(p => p.local).seat;
+    App.mySeat = this.players.find(p => p.local).seat;
     this.broadcastLobby();
   },
   sendTo(seat, msg) {
-    const p = this.players[seat];
+    const p = this.players.find(x => x.seat === seat); if (!p) return;
     if (p.local) Client.receive(JSON.parse(JSON.stringify(msg)));
     else if (p.bot) return;
     else { const c = this.conns.get(seat); if (c && c.open) c.send(msg); }
@@ -240,7 +258,9 @@ const Host = {
     this.players.forEach(p => { if (!p.bot) this.sendTo(p.seat, { t: 'view', view: C.viewFor(g, p.seat), roster: this.roster() }); });
   },
   startGame() {
-    const names = this.players.map(p => p.name);
+    // riempi con il computer i posti rimasti vuoti
+    for (let i = 0; i < this.cfg.players; i++) if (!this.players.some(p => p.seat === i)) this.addBot(i);
+    const names = []; for (let i = 0; i < this.cfg.players; i++) names[i] = (this.players.find(p => p.seat === i) || {}).name || 'Pc';
     this.game = C.newGame({ players: this.cfg.players, target: this.cfg.target, names });
     this.started = true;
     C.startDeal(this.game);
@@ -252,10 +272,8 @@ const Host = {
     const g = this.game; if (!g) return;
     if (g.phase === 'play') {
       const seat = g.pendingBuona ? g.pendingBuona.seat : g.turn;
-      const p = this.players[seat];
+      const p = this.players.find(x => x.seat === seat);
       if (p && p.bot) { clearTimeout(this.botTimer); this.botTimer = setTimeout(() => this.botMove(seat), g.pendingBuona ? 700 : 1100 + Math.random() * 600); }
-    } else if (g.phase === 'dealEnd' && this.players.every(p => p.bot || p.local)) {
-      // in allenamento l'utente preme "avanti"
     }
   },
   botMove(seat) {
@@ -385,21 +403,33 @@ function renderLobby() {
     const d = document.createElement('div'); d.className = `seat team${team} ${p ? 'full' : ''}`;
     d.innerHTML = p ? `<div class="avatar">${initials(p.name)}</div><div class="who">${esc(p.name)}${p.seat === App.mySeat ? ' (tu)' : ''} ${p.online ? '' : '<span class="offline">· offline</span>'}<div class="team">${n === 4 ? (team === 0 ? 'Coppia oro' : 'Coppia blu') : ''} ${i === 0 ? '· ospite del tavolo' : ''}</div></div>`
       : `<div class="avatar" style="background:rgba(255,255,255,.1);color:var(--testo-2)">?</div><div class="who" style="color:var(--testo-2);font-weight:400">Posto libero — condividi il codice</div>`;
-    if (App.mode === 'host' && p && i > 0 && !Host.started) {
-      const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '↔'; b.title = 'Scambia con il posto precedente';
-      b.onclick = () => Host.swapSeats(i, i - 1);
-      d.appendChild(b);
+    if (App.mode === 'host' && !Host.started) {
+      if (!p) {
+        const b = document.createElement('button'); b.className = 'btn sm oro'; b.textContent = '+ computer'; b.title = 'Fai giocare il computer in questo posto';
+        b.onclick = () => Host.addBot(i); d.appendChild(b);
+      } else if (p.bot) {
+        const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '✕'; b.title = 'Togli il computer';
+        b.onclick = () => Host.removeBot(i); d.appendChild(b);
+      }
+      if (n === 4 && p && !p.bot && i > 0) {
+        const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '↕'; b.title = 'Cambia coppia';
+        b.onclick = () => Host.swapSeats(i, i === 1 ? 2 : i === 2 ? 1 : 1); d.appendChild(b);
+      }
     }
     seats.appendChild(d);
   }
   const opp = App.roster.filter(p => p.seat !== App.mySeat && (n === 2 || (p.seat % 2) !== (App.mySeat % 2))).map(p => p.name);
   const rec = opp.length ? Record.get(opp) : null;
   $('#lobby-record').textContent = rec ? `Precedenti con ${rec.name}: ${rec.w} vinte · ${rec.l} perse` : '';
+  const humans = App.roster.filter(p => !p.bot);
   const full = App.roster.length >= n && App.roster.every(p => p.online);
-  $('#btn-start').disabled = !(App.mode === 'host' && full);
+  const canStart = App.mode === 'host' && App.roster.every(p => p.online) && (full || humans.length >= 1);
+  $('#btn-start').disabled = !canStart;
+  $('#btn-start').textContent = full ? 'Inizia la partita' : 'Inizia (il computer prende i posti liberi)';
   $('#btn-start').classList.toggle('hidden', App.mode !== 'host');
-  $('#lobby-info').textContent = n === 4 ? 'A coppie: i posti 1 e 3 giocano insieme (oro), 2 e 4 insieme (blu). L\'ospite può riordinare i posti con ↔.' : 'Uno contro uno, si vince a ' + App.cfg.target + '.';
-  $('#lobby-status').textContent = App.mode === 'host' ? (full ? 'Tutti al tavolo: puoi iniziare.' : `In attesa di ${n - App.roster.length} giocator${n - App.roster.length === 1 ? 'e' : 'i'}…`) : 'In attesa che l\'ospite inizi la partita…';
+  $('#lobby-info').textContent = n === 4 ? 'A coppie: i posti 1 e 3 giocano insieme (oro), 2 e 4 insieme (blu). Con ↕ sposti un amico nell\'altra coppia; i posti vuoti li può prendere il computer.' : 'Uno contro uno, si vince a ' + App.cfg.target + '. Se non arriva nessuno puoi far giocare il computer.';
+  const missing = n - App.roster.length;
+  $('#lobby-status').textContent = App.mode === 'host' ? (full ? 'Tutti al tavolo: puoi iniziare.' : `${missing} post${missing === 1 ? 'o libero' : 'i liberi'}: aspetta gli amici o aggiungi il computer.`) : 'In attesa che l\'ospite inizi la partita…';
 }
 
 /* =====================================================================
