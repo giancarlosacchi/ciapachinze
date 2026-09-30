@@ -651,6 +651,7 @@ const Stage = {
       const it = node._it; if (!it) continue;
       const mine = it.hand === App.mySeat;
       node.classList.toggle('selectable', mine && myTurn);
+      node.classList.toggle('playable', mine && myTurn && !!it.id && this.optionsOf(it.id).length > 0);
       node.onclick = null; node.onpointerdown = null;
       if (mine && myTurn) node.onpointerdown = e => this.dragStart(e, it.id);
       if (it.table != null) node.onclick = () => this.clickTable(it.table);

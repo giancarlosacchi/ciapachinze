@@ -136,7 +136,9 @@ input { font: inherit; }
 .card.target .face { box-shadow: 0 0 0 3px var(--basilico), 0 0 24px rgba(127,163,108,.75); }
 .card.target-dim .face { filter: brightness(.7); }
 .card.target.alt .face { box-shadow: 0 0 0 3px var(--oro-2), 0 0 24px rgba(240,199,80,.7); }
-.card.playable::after { content: ""; position: absolute; left: 50%; bottom: -10px; width: 6px; height: 6px; border-radius: 50%; background: var(--oro-2); transform: translateX(-50%); box-shadow: 0 0 8px var(--oro-2); }
+.card.playable .face { box-shadow: 0 0 0 2px var(--oro-2), 0 0 18px rgba(240,199,80,.55), 0 8px 18px rgba(0,0,0,.3); }
+.card.playable::after { content: ""; position: absolute; left: 50%; top: -12px; width: 8px; height: 8px; border-radius: 50%; background: var(--oro-2); transform: translateX(-50%); box-shadow: 0 0 10px var(--oro-2); }
+.card.selected.playable::after { display: none; }
 .card.no-anim { transition: none !important; }
 .card.scopa-mark { z-index: 3; }
 .card .face .val-hint { font-family: var(--font-body); }
