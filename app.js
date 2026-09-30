@@ -411,9 +411,16 @@ function renderLobby() {
         const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '✕'; b.title = 'Togli il computer';
         b.onclick = () => Host.removeBot(i); d.appendChild(b);
       }
-      if (n === 4 && p && !p.bot && i > 0) {
-        const b = document.createElement('button'); b.className = 'btn sm ghost'; b.textContent = '↕'; b.title = 'Cambia coppia';
-        b.onclick = () => Host.swapSeats(i, i === 1 ? 2 : i === 2 ? 1 : 1); d.appendChild(b);
+      if (n === 4 && p && !p.bot && p.seat !== App.mySeat) {
+        const withMe = (i % 2) === (App.mySeat % 2);
+        const b = document.createElement('button'); b.className = 'pairbtn ' + (withMe ? 'mine' : 'theirs');
+        b.innerHTML = withMe ? '<span class="dot"></span>Con me' : '<span class="dot"></span>Contro';
+        b.title = withMe ? 'Ora gioca in coppia con te: tocca per metterlo contro' : 'Ora gioca contro di te: tocca per metterlo in coppia con te';
+        // scambia con il posto dell'altra coppia più vicino
+        const otherPair = [0, 1, 2, 3].filter(k => (k % 2) !== (App.mySeat % 2)), myPair = [0, 1, 2, 3].filter(k => (k % 2) === (App.mySeat % 2) && k !== App.mySeat);
+        const target = withMe ? otherPair[0] : myPair[0];
+        b.onclick = () => Host.swapSeats(i, target);
+        d.appendChild(b);
       }
     }
     seats.appendChild(d);
