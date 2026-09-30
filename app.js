@@ -376,7 +376,13 @@ function onView(view, roster) {
   App.roster = roster || App.roster;
   const first = !App.view;
   if (view.eventId < App.seenEventId) App.seenEventId = 0;   // nuova partita
-  const newEvents = first ? [] : (view.events || []).filter(e => e.id > App.seenEventId);
+  let newEvents = first ? [] : (view.events || []).filter(e => e.id > App.seenEventId);
+  if (first && view.cardsPlayed === 0 && view.phase === 'play') {
+    // appena seduti: rigioca la distribuzione, così le carte arrivano dal mazzo
+    const evs = view.events || []; let k = evs.length - 1;
+    while (k > 0 && evs[k].type !== 'deal') k--;
+    if (k >= 0 && evs[k].type === 'deal') newEvents = evs.slice(k);
+  }
   App.seenEventId = view.eventId;
   queue.push({ view, events: newEvents });
   if (!processing) processQueue();
@@ -387,7 +393,8 @@ async function processQueue() {
   while (queue.length) {
     const { view, events } = queue.shift();
     // lo stato di riferimento per la simulazione: l'ultima vista
-    const sim = App.view ? JSON.parse(JSON.stringify(App.view)) : null;
+    const sim = App.view ? JSON.parse(JSON.stringify(App.view)) : (events.length ? Object.assign(JSON.parse(JSON.stringify(view)), { table: [], hands: view.hands.map(() => []), captured: [[], []], scope: [0, 0], scopeCards: [[], []] }) : null);
+    if (!App.view && events.length) { App.view = sim; Stage.render(sim); }
     for (const ev of events) { try { await Stage.animateEvent(ev, sim, view); } catch (e) { console.error('animazione', ev.type, e); } }
     App.view = view;
     Stage.render(view);
@@ -420,7 +427,7 @@ const Stage = {
     deck.innerHTML = '<div class="layer" style="transform:translate(4px,4px)"></div><div class="layer" style="transform:translate(2px,2px)"></div><div class="layer"></div><div class="count"></div>';
     this.el.appendChild(deck);
     for (let t = 0; t < 2; t++) {
-      const p = document.createElement('div'); p.className = 'pile'; p.id = 'pile' + t; p.innerHTML = `<span class="lbl"></span><span class="cnt"></span>`;
+      const p = document.createElement('div'); p.className = 'pile'; p.id = 'pile' + t; p.innerHTML = `<div class="layer l3"></div><div class="layer l2"></div><div class="layer l1"></div><span class="lbl"></span><span class="cnt"></span>`;
       p.onclick = () => Side.open('prese'); this.el.appendChild(p);
     }
     $('#mstrip').onclick = () => Side.open('prese');
@@ -454,9 +461,10 @@ const Stage = {
     if (this.mobile) return { x: 12, y: -ch / 2 };
     return n === 4 ? { x: 26, y: 80 } : { x: 34, y: this.H / 2 - ch / 2 };
   },
+  pileScale() { return this.mobile ? .72 : 1; },
   pilePos(team, view) {
-    const my = C.teamOf(view, App.mySeat), cw = this.cw(), ch = this.ch();
-    if (this.mobile) return team === my ? { x: this.W * .45 - cw / 2, y: -ch / 2 } : { x: this.W * .85 - cw / 2, y: -ch / 2 };
+    const my = C.teamOf(view, App.mySeat), cw = this.cw(), ch = this.ch(), k = this.pileScale();
+    if (this.mobile) return team === my ? { x: 8, y: this.H - ch * k - 26 } : { x: this.W - cw * k - 8, y: this.H / 2 - ch * k / 2 - 40 };
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
   tableSlots(count) {
@@ -483,8 +491,15 @@ const Stage = {
     }
     return out;
   },
+  /* piccolo disordine stabile per ogni carta: posate a mano, non da computer */
+  jitter(id, k = 1) {
+    let h = 2166136261; for (const c of id) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+    const r1 = ((h & 0xff) / 255 - .5), r2 = (((h >> 8) & 0xff) / 255 - .5), r3 = (((h >> 16) & 0xff) / 255 - .5);
+    return { dx: r1 * 12 * k, dy: r2 * 10 * k, rot: r3 * 9 * k };
+  },
   /** costruisce il layout completo da una vista */
   layout(view, opts = {}) {
+    if (this.reviewing) return this.reviewLayout(view);
     const items = []; const n = view.cfg.players;
     // mani
     for (let s = 0; s < n; s++) {
@@ -503,13 +518,48 @@ const Stage = {
     }
     // tavolo
     const slots = this.tableSlots(view.table.length);
-    view.table.forEach((t, i) => items.push({ key: t.id, id: t.id, face: true, ...slots[i], rot: 0, z: 5, table: i, val: t.val }));
+    view.table.forEach((t, i) => { const j = this.jitter(t.id); items.push({ key: t.id, id: t.id, face: true, x: slots[i].x + j.dx, y: slots[i].y + j.dy, rot: j.rot, z: 5, table: i, val: t.val }); });
     // scope segnate sui mazzetti
-    for (let t = 0; t < 2 && !this.mobile; t++) {
-      const pp = this.pilePos(t, view);
-      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + i * 5, y: pp.y - i * 3, rot: this.mobile ? (i % 2 ? 6 : -6) : 90 + (i % 2 ? 4 : -4), z: 3 + i, scopa: true }));
+    for (let t = 0; t < 2; t++) {
+      const pp = this.pilePos(t, view), k = this.pileScale(), cw = this.cw(), ch = this.ch();
+      // le scope spuntano da sotto il mazzetto: si vede solo un angolo
+      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + cw * k * .34 + i * 5, y: pp.y - ch * k * .22 - i * 4, rot: 16 + i * 6, z: 1, scale: k, scopa: true }));
     }
     return items;
+  },
+  /* tutte le carte prese, stese sul campo: le nostre in basso, le loro in alto */
+  reviewLayout(view) {
+    const my = C.teamOf(view, App.mySeat), cw = this.cw(), ch = this.ch();
+    const order = c => C.SUITS.indexOf(C.suitOf(c)) * 10 + C.rankOf(c);
+    const items = [];
+    const spread = (cards, top, bottom, team) => {
+      const sorted = cards.slice().sort((a, b) => order(a) - order(b));
+      const avail = this.W - 24, cols = Math.max(1, Math.min(sorted.length, Math.floor(avail / (cw * .62))));
+      const rows = Math.ceil(sorted.length / cols) || 1;
+      const stepX = cols > 1 ? Math.min(cw * 1.1, (avail - cw) / (cols - 1)) : 0;
+      const stepY = rows > 1 ? Math.min(ch * .55, (bottom - top - ch) / (rows - 1)) : 0;
+      sorted.forEach((id, i) => {
+        const r = Math.floor(i / cols), c = i % cols, inRow = Math.min(cols, sorted.length - r * cols);
+        const rowW = cw + (inRow - 1) * stepX, j = this.jitter(id, .6);
+        items.push({ key: 'rv:' + id, id, face: true, x: this.W / 2 - rowW / 2 + c * stepX + j.dx, y: top + r * stepY + j.dy, rot: j.rot, z: 5 + i, review: team, scopa: view.scopeCards[team].includes(id) });
+      });
+    };
+    const half = this.H / 2;
+    spread(view.captured[1 - my], 46, half - 12, 1 - my);
+    spread(view.captured[my], half + 12, this.H - ch - 12, my);
+    return items;
+  },
+  reviewCaptured(on) {
+    this.reviewing = on;
+    if (!App.view) return;
+    const sp = {};
+    for (let t = 0; t < 2; t++) { const pp = this.pilePos(t, App.view); App.view.captured[t].forEach(id => { sp['rv:' + id] = pp; sp['exit:rv:' + id] = pp; }); }
+    const items = this.layout(App.view);
+    if (on) items.forEach((it, i) => { it.delay = Math.min(1200, i * 18); });
+    this.draw(items, sp);
+    $('#review-bar').classList.toggle('hidden', !on);
+    for (const [k, n] of this.nodes) if (n._it && n._it.review != null) n.classList.toggle('target', !!n._it.scopa);
+    if (on) { const my = C.teamOf(App.view, App.mySeat); $('#review-lbl').textContent = `In alto ${App.view.cfg.players === 4 ? 'le loro' : 'le sue'} prese, in basso ${App.view.cfg.players === 4 ? 'le nostre' : 'le tue'} · con il bordo verde le scope`; }
   },
   /** disegna un layout (riconcilia i nodi) */
   draw(items, spawn = {}) {
@@ -539,7 +589,7 @@ const Stage = {
         node.classList.toggle('red', s === 'H' || s === 'D'); node.classList.toggle('denari', s === 'D');
       }
       node.style.transitionDelay = (it.delay || 0) + 'ms';
-      if (!(this.drag && this.drag.id === it.key)) node.style.transform = `translate(${it.x}px,${it.y}px) rotate(${it.rot || 0}deg) rotateY(${it.face ? 0 : 180}deg)`;
+      if (!(this.drag && this.drag.id === it.key)) node.style.transform = `translate(${it.x}px,${it.y}px) rotate(${it.rot || 0}deg) rotateY(${it.face ? 0 : 180}deg)${it.scale && it.scale !== 1 ? ` scale(${it.scale})` : ''}`;
       node.style.zIndex = it.z || 2;
       node.classList.toggle('scopa-mark', !!it.scopa);
       node.classList.toggle('selected', it.key === this.selected);
@@ -561,25 +611,21 @@ const Stage = {
   render(view) {
     this.measure();
     this.locked = queue.length > 0;
+    if (this.reviewing && view.phase === 'play') this.reviewCaptured(false);
     this.draw(this.layout(view));
     const mob = this.mobile;
-    $('#deck').classList.toggle('hidden', mob); $('#pile0').classList.toggle('hidden', mob); $('#pile1').classList.toggle('hidden', mob); $('#mstrip').classList.toggle('hidden', !mob);
-    if (mob) {
-      const my = C.teamOf(view, App.mySeat);
-      const fmt = (t, lbl) => `${lbl} ${view.captured[t].length}${view.scope[t] ? ` · ${view.scope[t]} scop${view.scope[t] === 1 ? 'a' : 'e'}` : ''}`;
-      $('#ms-deck').textContent = `mazzo ${view.deckCount}`;
-      $('#ms-mine').textContent = fmt(my, view.cfg.players === 4 ? 'noi' : 'tu');
-      $('#ms-theirs').textContent = fmt(1 - my, view.cfg.players === 4 ? 'loro' : (view.names[view.teams[1 - my][0]] || 'loro').split(' ')[0]);
-    }
+    $('#deck').classList.toggle('hidden', mob); $('#mstrip').classList.toggle('hidden', !mob);
+    if (mob) $('#ms-deck').textContent = `mazzo: ${view.deckCount} carte`;
     const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount ? `${view.deckCount} carte nel mazzo` : 'mazzo finito';
     deck.style.opacity = view.deckCount ? 1 : .25;
     const my = C.teamOf(view, App.mySeat);
     for (let t = 0; t < 2; t++) {
       const p = $('#pile' + t), pp = this.pilePos(t, view);
       p.style.left = pp.x + 'px'; p.style.top = pp.y + 'px';
-      p.className = 'pile ' + (t === my ? 't0' : 't1') + (mob ? ' hidden' : '');
-      p.querySelector('.lbl').textContent = t === my ? (view.cfg.players === 4 ? 'le nostre prese' : 'le tue prese') : (view.cfg.players === 4 ? 'le loro prese' : 'le sue prese');
       const nc = view.captured[t].length, sc = view.scope[t];
+      p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '');
+      p.style.transform = `scale(${this.pileScale()})`;
+      p.querySelector('.lbl').textContent = nc ? '' : (t === my ? (view.cfg.players === 4 ? 'le nostre prese' : 'le tue prese') : (view.cfg.players === 4 ? 'le loro prese' : 'le sue prese'));
       p.querySelector('.cnt').textContent = `${nc} cart${nc === 1 ? 'a' : 'e'}${sc ? ` · ${sc} scop${sc === 1 ? 'a' : 'e'}` : ''}`;
     }
     this.updateInteractivity(view);
@@ -736,13 +782,13 @@ const Stage = {
     const node = this.nodes.get(id); if (!node) return;
     const it = node._it;
     const drag = { id, node, x0: e.clientX, y0: e.clientY, ox: it.x, oy: it.y, moved: false, over: false };
-    this.drag = drag;
     node.setPointerCapture(e.pointerId);
     // già alla pressione: evidenzia cosa prende questa carta (seconda pressione sulla stessa = rimetti in mano)
     if (this.selected === id && !this.floating) { drag.deselect = true; }
     if (this.selected && this.selected !== id) this.clearSelection();
     this.selected = id; this.floating = false;
     this.draw(this.layout(App.view));
+    this.drag = drag;
     this.showOptions(id);
     this.showDropzone(true, false);
     const move = ev => {
@@ -963,7 +1009,8 @@ function showDealEnd(view) {
   const m = modal(html, { closable: false }); m.id = 'end-modal';
   Sound.play(gameOver ? (iWon ? 'win' : 'lose') : (d.teams[my].total >= d.teams[ot].total ? 'take' : 'card'));
   if (gameOver && iWon) Stage.sparks();
-  m.querySelector('#end-prese').onclick = () => { Side.open('prese'); };
+  m.querySelector('#end-prese').onclick = () => { m.classList.add('hidden'); Stage.reviewCaptured(true); };
+  $('#review-close').onclick = () => { Stage.reviewCaptured(false); m.classList.remove('hidden'); };
   const nb = m.querySelector('#end-next'); if (nb) nb.onclick = () => { nb.disabled = true; nb.textContent = 'In attesa…'; Client.send({ t: 'next' }); };
   const ab = m.querySelector('#end-again'); if (ab) ab.onclick = () => { Client.send({ t: 'again' }); m.remove(); };
   // il modale viene chiuso all'arrivo della nuova smazzata
