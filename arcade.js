@@ -208,11 +208,12 @@
 
   /* ---------- progresso salvato ---------- */
   const KEY = 'cpz-arcade';
+  const S = () => (root.Store || { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } });
   function load() {
-    try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { return blank(); }
+    try { const raw = JSON.parse(S().get(KEY) || '{}'); const b = blank(); return Object.assign(b, raw, { stats: Object.assign(b.stats, raw.stats || {}) }); } catch (e) { return blank(); }
   }
   function blank() { return { stars: {}, unlocked: [], stats: { coopDone: 0, stagesDone: 0, scope: 0, settebello: 0, buone: 0, decini: 0, piccola: 0, grande: 0, cappotti: 0, cleanDeals: 0, streak: 0, bestStreak: 0, zonesDone: [], threeStars: 0, dealsWon: 0, dealsLost: 0 } }; }
-  function save(p) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {} }
+  function save(p) { S().set(KEY, JSON.stringify(p)); }
   function isUnlocked(p, id) { return id === 1 || (p.stars[id - 1] || 0) >= 1; }
   function totalStars(p) { return Object.values(p.stars).reduce((a, b) => a + b, 0); }
 

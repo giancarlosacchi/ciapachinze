@@ -27,10 +27,54 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const initials = n => (n || '?').replace(/\(.*?\)/g, '').trim().split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 
 /* =====================================================================
+   Salvataggio robusto: localStorage + copia in IndexedDB (sopravvive meglio su iPhone/Android)
+   ===================================================================== */
+const Store = {
+  keys: ['cpz-name', 'cpz-arcade', 'cpz-record', 'cpz-4col', 'cpz-sound', 'cpz-token'],
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return this.mem[k] ?? null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} this.mem[k] = v; this.mirror(); },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} delete this.mem[k]; this.deleted.add(k); this.mirror(); },
+  mem: {}, deleted: new Set(),
+  db() {
+    if (this._db) return this._db;
+    this._db = new Promise((res) => {
+      try {
+        const r = indexedDB.open('ciapachinze', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result); r.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+    return this._db;
+  },
+  async mirror() {
+    const db = await this.db(); if (!db) return;
+    try { const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'); for (const k of this.keys) { const v = this.get(k); if (v != null) st.put(v, k); else if (this.deleted.has(k)) st.delete(k); } this.deleted.clear(); } catch (e) {}
+  },
+  /* all'avvio: se localStorage è vuoto ma IndexedDB ha dati (o viceversa), riallinea */
+  async restore() {
+    const db = await this.db(); if (!db) return false;
+    return new Promise(res => {
+      try {
+        const tx = db.transaction('kv', 'readonly'), st = tx.objectStore('kv'); let changed = false, pending = this.keys.length;
+        for (const k of this.keys) {
+          const rq = st.get(k);
+          rq.onsuccess = () => { const v = rq.result; const cur = this.get(k); if (v != null && cur == null) { try { localStorage.setItem(k, v); } catch (e) {} this.mem[k] = v; changed = true; } if (--pending === 0) res(changed); };
+          rq.onerror = () => { if (--pending === 0) res(changed); };
+        }
+      } catch (e) { res(false); }
+    });
+  },
+  /* esporta/importa tutto (per cambiare telefono) */
+  exportAll() { const o = {}; this.keys.forEach(k => { const v = this.get(k); if (v != null && k !== 'cpz-token') o[k] = v; }); return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); },
+  importAll(code) { try { const o = JSON.parse(decodeURIComponent(escape(atob(code.trim())))); Object.keys(o).forEach(k => { if (this.keys.includes(k)) this.set(k, o[k]); }); return true; } catch (e) { return false; } },
+};
+window.Store = Store;
+
+/* =====================================================================
    Suoni (sintetizzati, nessun file)
    ===================================================================== */
 const Sound = (() => {
-  let ctx = null, on = localStorage.getItem('cpz-sound') !== 'off';
+  let ctx = null, on = Store.get('cpz-sound') !== 'off';
   const ac = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
   function tone(f, t0, dur, type = 'sine', g = .18) {
     const a = ac(), o = a.createOscillator(), gn = a.createGain();
@@ -64,7 +108,7 @@ const Sound = (() => {
       }
     } catch (e) { /* audio non disponibile */ }
   };
-  return { play, get on() { return on; }, set on(v) { on = v; localStorage.setItem('cpz-sound', v ? 'on' : 'off'); } };
+  return { play, get on() { return on; }, set on(v) { on = v; Store.set('cpz-sound', v ? 'on' : 'off'); } };
 })();
 
 /* =====================================================================
@@ -80,8 +124,8 @@ const suitIcon = (s, x, y, size, col) => `<path d="${SUIT_PATH[s]}" fill="${col}
 const FONT_NUM = "'Nunito Sans', 'Arial Black', Arial, sans-serif";
 const Record = {
   key: 'cpz-record',
-  load() { try { return JSON.parse(localStorage.getItem(this.key) || '{}'); } catch (e) { return {}; } },
-  save(r) { try { localStorage.setItem(this.key, JSON.stringify(r)); } catch (e) {} },
+  load() { try { return JSON.parse(Store.get(this.key) || '{}'); } catch (e) { return {}; } },
+  save(r) { Store.set(this.key, JSON.stringify(r)); },
   norm: n => String(n || '').replace(/\s*\(pc\)/, '').trim().toLowerCase(),
   add(opponents, won) {
     const r = this.load(); const k = opponents.map(this.norm).sort().join(' & ');
@@ -93,8 +137,8 @@ const Record = {
   get(opponents) { const r = this.load(); return r[opponents.map(this.norm).sort().join(' & ')] || null; },
 };
 const Settings = {
-  get fourColor() { try { return localStorage.getItem('cpz-4col') === 'on'; } catch (e) { return false; } },
-  set fourColor(v) { try { localStorage.setItem('cpz-4col', v ? 'on' : 'off'); } catch (e) {} },
+  get fourColor() { return Store.get('cpz-4col') === 'on'; },
+  set fourColor(v) { Store.set('cpz-4col', v ? 'on' : 'off'); },
 };
 // colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
 function suitColor(s) {
@@ -148,7 +192,7 @@ const ICE = { iceServers: [
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
 ] };
-const token = (() => { let t = localStorage.getItem('cpz-token'); if (!t) { t = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('cpz-token', t); } return t; })();
+const token = (() => { let t = Store.get('cpz-token'); if (!t) { t = Math.random().toString(36).slice(2) + Date.now().toString(36); Store.set('cpz-token', t); } return t; })();
 const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 
 function showScreen(id) {
@@ -359,7 +403,7 @@ function makePeer(id) {
   return p;
 }
 const Session = {
-  save() { try { if (App.mode === 'host' || App.mode === 'guest') localStorage.setItem('cpz-session', JSON.stringify({ mode: App.mode, code: App.code, name: App.myName, cfg: App.cfg, at: Date.now() })); } catch (e) {} },
+  save() { try { if ((App.mode === 'host' || App.mode === 'guest') && !App.arcade) localStorage.setItem('cpz-session', JSON.stringify({ mode: App.mode, code: App.code, name: App.myName, cfg: App.cfg, at: Date.now() })); } catch (e) {} },
   load() { try { const s = JSON.parse(localStorage.getItem('cpz-session') || 'null'); return s && Date.now() - s.at < 6 * 3600e3 ? s : null; } catch (e) { return null; } },
   clear() { try { localStorage.removeItem('cpz-session'); } catch (e) {} },
 };
@@ -1330,21 +1374,23 @@ const Voice = {
 function seg(id, cb) { const el = $(id); el.querySelectorAll('button').forEach(b => b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b.dataset.v); }); }
 seg('#seg-players', v => App.cfg.players = +v);
 seg('#seg-target', v => App.cfg.target = +v);
-const savedName = localStorage.getItem('cpz-name') || '';
+const savedName = Store.get('cpz-name') || '';
 $('#host-name').value = savedName; $('#join-name').value = savedName;
+// il nome si salva mentre lo scrivi, non solo quando premi un pulsante
+['#host-name', '#join-name'].forEach(sel => $(sel).addEventListener('input', e => { const v = e.target.value.trim(); if (v) Store.set('cpz-name', v); }));
 function applyName() {
-  const n = (localStorage.getItem('cpz-name') || '').trim();
+  const n = (Store.get('cpz-name') || '').trim();
   $$('.name-field').forEach(f => f.classList.toggle('hidden', !!n));
   $('#hello').classList.toggle('hidden', !n);
   if (n) { $('#hello-name').textContent = n; $('#host-name').value = n; $('#join-name').value = n; }
 }
 applyName();
-$('#btn-change-name').onclick = () => { localStorage.removeItem('cpz-name'); $('#host-name').value = ''; $('#join-name').value = ''; applyName(); $('#host-name').focus(); };
-const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || localStorage.getItem('cpz-name') || '').trim();
+$('#btn-change-name').onclick = () => openSettings();
+const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || Store.get('cpz-name') || '').trim();
 const hashCode = (location.hash || '').replace('#', '').toUpperCase();
 if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; setTimeout(() => $('#join-name').focus(), 100); }
 
-function needName(input) { const n = myName(); if (!n) { $$('.name-field').forEach(f => f.classList.remove('hidden')); input.focus(); toast('Scrivi prima il tuo nome'); return null; } localStorage.setItem('cpz-name', n); applyName(); return n; }
+function needName(input) { const n = myName(); if (!n) { $$('.name-field').forEach(f => f.classList.remove('hidden')); input.focus(); toast('Scrivi prima il tuo nome'); return null; } Store.set('cpz-name', n); applyName(); return n; }
 $('#btn-host').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, false); };
 $('#btn-solo').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, true); };
 $('#btn-join').onclick = () => { const code = $('#join-code').value.trim().toUpperCase(); if (!/^[A-Z0-9]{6}$/.test(code)) { $('#join-status').textContent = 'Inserisci il codice di 6 caratteri.'; return; } const name = needName($('#join-name')); if (name) joinRoom(code, name); };
@@ -1354,9 +1400,20 @@ $('#btn-settings-home').onclick = () => openSettings();
 $('#btn-rules').onclick = () => openSettings();
 function openSettings() {
   const m = modal(`<h2>Impostazioni</h2>
+    <div class="field"><label for="opt-name">Il tuo nome</label><input id="opt-name" maxlength="16" placeholder="es. Mario Rossi" value="${esc(Store.get('cpz-name') || '')}"></div>
     <label class="opt"><input type="checkbox" id="opt-4col" ${Settings.fourColor ? 'checked' : ''}> <span><b>Carte a quattro colori</b><br><small>♥ rosso, ♦ blu, ♣ verde, ♠ nero: i semi si riconoscono al volo</small></span></label>
     <label class="opt"><input type="checkbox" id="opt-sound" ${Sound.on ? 'checked' : ''}> <span><b>Suoni</b></span></label>
-    <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" onclick="this.closest('.modal-bg').remove()">Chiudi</button></div>`);
+    <details class="backup"><summary>Salvataggi (nome, arcade, storico)</summary>
+      <p style="font-size:13px;margin:6px 0">Tutto è salvato su questo telefono e resta anche dopo gli aggiornamenti dell'app. Per portarlo su un altro telefono copia il codice e incollalo lì.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost" id="opt-export">Copia codice di salvataggio</button><button class="btn sm ghost" id="opt-import">Incolla un codice</button></div>
+    </details>
+    <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" id="opt-close">Salva e chiudi</button></div>`);
+  const nameIn = m.querySelector('#opt-name');
+  const saveName = () => { const v = nameIn.value.trim(); if (v) { Store.set('cpz-name', v); applyName(); } };
+  nameIn.addEventListener('input', saveName);
+  m.querySelector('#opt-close').onclick = () => { saveName(); m.remove(); };
+  m.querySelector('#opt-export').onclick = () => { const code = Store.exportAll(); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => toast('Codice copiato: incollalo nelle impostazioni dell\'altro telefono'), () => { const ta = document.createElement('textarea'); ta.value = code; ta.style.cssText = 'width:100%;height:80px;margin-top:8px'; m.querySelector('.backup').appendChild(ta); ta.select(); }); };
+  m.querySelector('#opt-import').onclick = () => { const box = document.createElement('div'); box.innerHTML = `<input id="imp-code" placeholder="incolla qui il codice" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff"><button class="btn sm oro" id="imp-go" style="margin-top:6px">Importa</button>`; m.querySelector('.backup').appendChild(box); box.querySelector('#imp-go').onclick = () => { if (Store.importAll(box.querySelector('#imp-code').value)) { toast('Salvataggi importati'); setTimeout(() => location.reload(), 800); } else toast('Codice non valido'); }; };
   m.querySelector('#opt-4col').onchange = e => { Settings.fourColor = e.target.checked; if (App.view) { Stage.nodes.forEach(n => { n.dataset.face = ''; }); Stage.render(App.view); } };
   m.querySelector('#opt-sound').onchange = e => { Sound.on = e.target.checked; };
   m.querySelector('#opt-rules').onclick = () => { m.remove(); modal(RULES_HTML); };
@@ -1454,14 +1511,14 @@ const ArcadeUI = {
     const botNames = st.players === 4 ? ['Avversario 1', 'Il tuo compagno', 'Avversario 2'] : [st.who];
     if (st.players === 4) { botNames[0] = st.who; botNames[2] = st.who + ' 2'; }
     App.seenEventId = 0; App.view = null;
-    hostRoom({ players: st.players, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0 }, botLevel: st.level, botNames }, localStorage.getItem('cpz-name') || 'Tu', true);
+    hostRoom({ players: st.players, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0 }, botLevel: st.level, botNames }, Store.get('cpz-name') || 'Tu', true);
     App.mode = 'solo'; App.arcade = st;
     setTimeout(() => this.goalbar(), 50);
   },
   startCoop(st) {
     this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
     App.seenEventId = 0; App.view = null; App.arcade = st;
-    const name = localStorage.getItem('cpz-name') || 'Tu';
+    const name = Store.get('cpz-name') || 'Tu';
     hostRoom({ players: 4, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0, coop: true }, botLevel: st.level }, name, false);
     // due avversari computer ai posti 1 e 3; il posto 2 (il mio compagno) resta per l'amico
     setTimeout(() => { Host.addBot(1); Host.addBot(3); const b1 = Host.players.find(p => p.seat === 1), b3 = Host.players.find(p => p.seat === 3); if (b1) { b1.name = st.who; b1.level = st.level; } if (b3) { b3.name = st.who + ' 2'; b3.level = st.level; } Host.broadcastLobby(); }, 50);
@@ -1533,5 +1590,6 @@ $('#btn-achievements').onclick = () => {
   modal(`<h2>Traguardi<small>${p.unlocked.length} su ${Arcade.ACHIEVEMENTS.length}</small></h2><div class="ach-grid">${Arcade.ACHIEVEMENTS.map(a => `<div class="ach ${p.unlocked.includes(a.id) ? '' : 'locked'}"><div class="ic">${a.icon}</div><div class="nm">${esc(a.name)}</div><div class="ds">${esc(a.desc)}</div></div>`).join('')}</div><div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Chiudi</button></div>`);
 };
 ArcadeUI.homeProgress();
-window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, busy: () => processing || queue.length > 0 };
+Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); } Store.mirror(); });
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, busy: () => processing || queue.length > 0 };
 })();

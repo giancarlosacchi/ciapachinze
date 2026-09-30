@@ -426,3 +426,6 @@ input { font: inherit; }
 
 .arcade-mode { max-width: 420px; margin-bottom: 6px; }
 .arcade-mode button.on { background: var(--oro-2); border-color: var(--oro-2); color: var(--inchiostro); }
+
+.backup { margin: 8px 0; color: var(--testo-2); font-size: 14px; }
+.backup summary { cursor: pointer; color: var(--avorio); }
