@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Ciapachinze — Cirulla online</title>
+<meta name="description" content="Ciapachinze: gioca a Cirulla online con gli amici, con chiamata vocale e walkie-talkie. 2 o 4 giocatori.">
+<meta name="theme-color" content="#1e2a33">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..900,0..100,0..1;1,9..144,400..900,0..100,0..1&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..900;1,6..12,400..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<section id="scr-home" class="screen">
+  <div class="home">
+    <div class="wordmark big" aria-label="Ciapachinze">c<span class="i h">ı</span>apach<span class="i d">ı</span>nze<span class="badge">15</span></div>
+    <p class="tag">la cirulla genovese, online — con la voce degli amici al tavolo</p>
+    <div class="home-cards">
+      <div class="panel">
+        <h2>Apri un tavolo</h2>
+        <div class="field"><label for="host-name">Il tuo nome</label><input id="host-name" maxlength="16" placeholder="es. Giancarlo" autocomplete="nickname"></div>
+        <div class="field"><label>Giocatori</label>
+          <div class="seg" id="seg-players"><button data-v="2" class="on">2 · uno contro uno</button><button data-v="4">4 · a coppie</button></div></div>
+        <div class="field"><label>Si vince a</label>
+          <div class="seg" id="seg-target"><button data-v="51" class="on">51</button><button data-v="71">71</button><button data-v="101">101</button></div></div>
+        <button id="btn-host" class="btn wide">Apri il tavolo</button>
+      </div>
+      <div class="panel">
+        <h2>Siediti a un tavolo</h2>
+        <div class="field"><label for="join-name">Il tuo nome</label><input id="join-name" maxlength="16" placeholder="es. Marco" autocomplete="nickname"></div>
+        <div class="field"><label for="join-code">Codice del tavolo</label><input id="join-code" maxlength="6" placeholder="es. K7PZ3Q" style="text-transform:uppercase;letter-spacing:.15em"></div>
+        <button id="btn-join" class="btn oro wide">Entra</button>
+        <p class="status" id="join-status"></p>
+      </div>
+    </div>
+    <p class="home-foot">
+      <button class="linkish" id="btn-rules-home">Come si gioca</button> ·
+      <button class="linkish" id="btn-solo">Allenati contro il computer</button>
+    </p>
+  </div>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section id="scr-lobby" class="screen off">
+  <div class="lobby panel">
+    <div class="wordmark small" aria-label="Ciapachinze">c<span class="i h">ı</span>apach<span class="i d">ı</span>nze<span class="badge">15</span></div>
+    <h2 style="margin-top:14px">Tavolo aperto</h2>
+    <div class="code-box">
+      <div><div style="font-size:13px;color:var(--testo-2)">Codice</div><div class="code" id="lobby-code">——</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm ghost" id="btn-copy-code">Copia codice</button>
+        <button class="btn sm oro" id="btn-copy-link">Copia link d'invito</button>
+        <button class="btn sm ghost" id="btn-share" style="display:none">Condividi</button>
+      </div>
+    </div>
+    <div id="lobby-info" class="status"></div>
+    <div class="seats" id="seats"></div>
+    <div id="lobby-status" class="status"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      <button class="btn ghost" id="btn-leave-lobby">Esci</button>
+      <button class="btn" id="btn-start" disabled>Inizia la partita</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GIOCO ============ -->
+<section id="game" class="hidden">
+  <div class="topbar">
+    <div class="wordmark small" aria-label="Ciapachinze">c<span class="i h">ı</span>apach<span class="i d">ı</span>nze<span class="badge">15</span></div>
+    <div class="spacer"></div>
+    <div class="scores">
+      <div class="score t0"><span class="dot"></span><span id="sc-n0">Noi</span><b id="sc-0">0</b></div>
+      <span class="score vs">·</span>
+      <div class="score t1"><span class="dot"></span><span id="sc-n1">Loro</span><b id="sc-1">0</b></div>
+      <span class="target" id="sc-target">a 51</span>
+    </div>
+    <button class="iconbtn" id="btn-sound" title="Suoni">🔔</button>
+    <button class="iconbtn" id="btn-rules" title="Regole">?</button>
+    <button class="iconbtn" id="btn-side" title="Prese, storico e chat">☰<span class="n hidden" id="side-badge">0</span></button>
+  </div>
+  <div class="stage-wrap" id="stage-wrap">
+    <div class="felt"></div>
+    <div class="stage" id="stage"></div>
+    <div class="mstrip hidden" id="mstrip"><span id="ms-deck">mazzo 40</span><span id="ms-mine"></span><span id="ms-theirs"></span></div>
+    <div class="choices hidden" id="choices"></div>
+    <div class="hint hidden" id="hint"></div>
+    <aside class="side" id="side">
+      <header><h3 id="side-title">Tavolo</h3><button class="iconbtn" id="btn-side-close">✕</button></header>
+      <div class="tabs"><button class="on" data-tab="prese">Prese</button><button data-tab="storico">Storico</button><button data-tab="chat">Chat</button></div>
+      <div class="body" id="side-body"></div>
+      <div class="chat hidden" id="chat-bar"><input id="chat-input" placeholder="Scrivi al tavolo…" maxlength="200"><button class="btn sm" id="chat-send">Invia</button></div>
+    </aside>
+  </div>
+  <div class="bottombar">
+    <div class="voice" id="voice">
+      <button class="vbtn call" id="btn-call" title="Chiamata continua: vi sentite sempre">📞 <span class="lbl">Chiamata</span></button>
+      <button class="vbtn ptt" id="btn-ptt" title="Tieni premuto per parlare (o la barra spaziatrice)">🎙 <span class="lbl">Walkie-talkie</span></button>
+      <button class="vbtn mute" id="btn-mute" title="Silenzia il tuo microfono">🔇</button>
+      <div class="lvl" title="Livello del tuo microfono"><i id="lvl-me"></i></div>
+    </div>
+  </div>
+</section>
+
+<div id="modals"></div>
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';document.head.appendChild(s)"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

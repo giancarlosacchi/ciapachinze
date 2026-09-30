@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1e2a33"/>
+  <g transform="rotate(9 32 32)">
+    <rect x="16" y="10" width="32" height="44" rx="5" fill="#fbf7ee" stroke="#e9e0cb" stroke-width="2"/>
+    <text x="32" y="40" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="22" fill="#c8202f">15</text>
+    <text x="21" y="20" font-family="system-ui" font-size="8" fill="#c8202f">♦</text>
+    <text x="38" y="51" font-family="system-ui" font-size="8" fill="#c8202f">♥</text>
+  </g>
+</svg>
