@@ -428,9 +428,8 @@ const Stage = {
     this.el.appendChild(deck);
     for (let t = 0; t < 2; t++) {
       const p = document.createElement('div'); p.className = 'pile'; p.id = 'pile' + t; p.innerHTML = `<div class="layer l3"></div><div class="layer l2"></div><div class="layer l1"></div><span class="lbl"></span><span class="cnt"></span>`;
-      p.onclick = () => Side.open('prese'); this.el.appendChild(p);
+      this.el.appendChild(p);
     }
-    $('#mstrip').onclick = () => Side.open('prese');
     new ResizeObserver(() => { this.measure(); if (App.view) { this.render(App.view); renderPlayers(App.view); } }).observe(this.wrap);
     this.measure();
     window.addEventListener('keydown', e => { if (e.key === 'Escape' && this.selected) this.clearSelection(); });
@@ -626,7 +625,8 @@ const Stage = {
       p.className = 'pile ' + (t === my ? 't0' : 't1') + (nc ? ' full' : '');
       p.style.transform = `scale(${this.pileScale()})`;
       p.querySelector('.lbl').textContent = nc ? '' : (t === my ? (view.cfg.players === 4 ? 'le nostre prese' : 'le tue prese') : (view.cfg.players === 4 ? 'le loro prese' : 'le sue prese'));
-      p.querySelector('.cnt').textContent = `${nc} cart${nc === 1 ? 'a' : 'e'}${sc ? ` · ${sc} scop${sc === 1 ? 'a' : 'e'}` : ''}`;
+      p.querySelector('.cnt').textContent = nc ? nc : '';
+      p.title = `${nc} cart${nc === 1 ? 'a' : 'e'}${sc ? ` · ${sc} scop${sc === 1 ? 'a' : 'e'}` : ''}`;
     }
     this.updateInteractivity(view);
     // la selezione sopravvive a un aggiornamento solo se è ancora valida
@@ -1010,6 +1010,7 @@ function showDealEnd(view) {
   Sound.play(gameOver ? (iWon ? 'win' : 'lose') : (d.teams[my].total >= d.teams[ot].total ? 'take' : 'card'));
   if (gameOver && iWon) Stage.sparks();
   m.querySelector('#end-prese').onclick = () => { m.classList.add('hidden'); Stage.reviewCaptured(true); };
+  m.querySelector('#end-prese').title = 'Si possono guardare solo a fine smazzata';
   $('#review-close').onclick = () => { Stage.reviewCaptured(false); m.classList.remove('hidden'); };
   const nb = m.querySelector('#end-next'); if (nb) nb.onclick = () => { nb.disabled = true; nb.textContent = 'In attesa…'; Client.send({ t: 'next' }); };
   const ab = m.querySelector('#end-again'); if (ab) ab.onclick = () => { Client.send({ t: 'again' }); m.remove(); };
@@ -1031,7 +1032,7 @@ const RULES_HTML = `<h2>Come si gioca a Cirulla<small>ciapachinze = acchiappa qu
    Pannello laterale: prese, storico, chat
    ===================================================================== */
 const Side = {
-  tab: 'prese', unread: 0, chats: [],
+  tab: 'storico', unread: 0, chats: [],
   open(tab) { if (tab) this.setTab(tab); $('#side').classList.add('open'); this.unread = 0; this.badge(); },
   close() { $('#side').classList.remove('open'); },
   setTab(t) { this.tab = t; $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $('#chat-bar').classList.toggle('hidden', t !== 'chat'); this.refresh(); },
@@ -1039,18 +1040,14 @@ const Side = {
   addChat(seat, text) { const name = (App.view && App.view.names[seat]) || (App.roster.find(p => p.seat === seat) || {}).name || '?'; this.chats.push({ name, text }); if (!$('#side').classList.contains('open') || this.tab !== 'chat') { this.unread++; this.badge(); toast(`${name}: ${text}`, 3500); } this.refresh(); },
   refresh() {
     const body = $('#side-body'); const view = App.view; if (!view) return;
-    if (this.tab === 'prese') {
-      const my = C.teamOf(view, App.mySeat);
-      const block = (t, title) => { const cards = view.captured[t].slice().sort((a, b) => C.SUITS.indexOf(C.suitOf(a)) - C.SUITS.indexOf(C.suitOf(b)) || C.rankOf(a) - C.rankOf(b)); const sc = view.scopeCards[t]; return `<div class="prese-team"><h4>${title} · ${cards.length} carte · ${view.scope[t]} scope${view.scope[t] !== sc.length ? ' (incl. buone)' : ''}</h4><div class="minicards">${cards.length ? cards.map(id => miniCard(id, sc.includes(id) ? 'scopa' : '')).join('') : '<span style="color:var(--testo-2);font-size:13px">ancora nessuna carta</span>'}</div></div>`; };
-      const lc = view.lastCapture ? `<div class="prese-team"><h4>Ultima presa · ${esc(view.names[view.lastCapture.seat])}${view.lastCapture.scopa ? ' · scopa' : ''}</h4><div class="minicards">${(view.lastCapture.played ? [view.lastCapture.played] : []).concat(view.lastCapture.cards).map(id => miniCard(id)).join('')}</div></div>` : '';
-      body.innerHTML = lc + block(my, view.cfg.players === 4 ? 'Noi' : 'Tu') + block(1 - my, view.cfg.players === 4 ? 'Loro' : esc(view.names[view.teams[1 - my][0]]));
+    if (false) {
     } else if (this.tab === 'storico') {
       const evs = view.events.slice().reverse().filter(e => ['play', 'buona', 'dealer-buona', 'deal-end', 'deal'].includes(e.type));
       body.innerHTML = `<div class="log">${evs.map(e => {
-        if (e.type === 'play') return `<div class="e ${e.scopa ? 'scopa' : ''}"><span class="who">${esc(view.names[e.seat])}</span><span>gioca ${cardShort(e.card)}${e.captured.length ? ` e prende ${e.captured.map(cardShort).join(' ')}${e.kind === 'fifteen' ? ' (15)' : e.kind === 'ace' ? ' (asso)' : ''}` : ' e la lascia'}${e.scopa ? ' · SCOPA' : ''}</span></div>`;
-        if (e.type === 'buona') return `<div class="e buona"><span class="who">${esc(view.names[e.seat])}</span><span>bussa: ${esc(e.label)} (+${e.points}) — ${e.cards.map(cardShort).join(' ')}</span></div>`;
+        if (e.type === 'play') return `<div class="e ${e.scopa ? 'scopa' : ''}"><span class="who">${esc(view.names[e.seat])}</span><span>${e.captured.length ? `prende ${e.captured.length + 1} cart${e.captured.length + 1 === 1 ? 'a' : 'e'}${e.kind === 'fifteen' ? ' facendo 15' : e.kind === 'ace' ? ' con l\'asso' : ''}` : 'lascia una carta in tavola'}${e.scopa ? ' · SCOPA' : ''}</span></div>`;
+        if (e.type === 'buona') return `<div class="e buona"><span class="who">${esc(view.names[e.seat])}</span><span>bussa: ${esc(e.label)} (+${e.points})</span></div>`;
         if (e.type === 'dealer-buona') return `<div class="e buona"><span class="who">${esc(view.names[e.seat])}</span><span>buona del mazziere: ${e.sum} in tavola (+${e.points})</span></div>`;
-        if (e.type === 'deal') return `<div class="e"><span class="who">Mazziere ${esc(view.names[e.dealer])}</span><span>${e.round === 0 ? 'nuova smazzata' + (e.table ? ': in tavola ' + e.table.map(cardShort).join(' ') : '') : 'dà altre 3 carte'}</span></div>`;
+        if (e.type === 'deal') return `<div class="e"><span class="who">Mazziere ${esc(view.names[e.dealer])}</span><span>${e.round === 0 ? 'nuova smazzata' : 'dà altre 3 carte'}</span></div>`;
         if (e.type === 'deal-end') return `<div class="e"><span class="who">Fine smazzata</span><span>${e.scores.join(' – ')}</span></div>`;
         return '';
       }).join('')}</div>`;

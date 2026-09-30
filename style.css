@@ -105,7 +105,7 @@ input { font: inherit; }
 .score .dot { width: 10px; height: 10px; border-radius: 50%; }
 .score.t0 .dot { background: var(--oro); } .score.t1 .dot { background: var(--mare); }
 .score .vs { color: var(--testo-2); }
-.target { font-size: 12px; color: var(--testo-2); }
+.goal { font-size: 12px; color: var(--testo-2); }
 .iconbtn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); color: var(--avorio); display: grid; place-items: center; font-size: 18px; position: relative; }
 .iconbtn.on { background: var(--avorio); color: var(--inchiostro); }
 .iconbtn .n { position: absolute; top: -6px; right: -6px; background: var(--rosso); color: #fff; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 6px; }
@@ -151,7 +151,9 @@ input { font: inherit; }
 .pile.full .layer { display: block; }
 .pile.full .l3 { transform: translate(5px,5px) rotate(2deg); } .pile.full .l2 { transform: translate(2px,2px) rotate(-1deg); }
 .pile:hover { border-color: rgba(255,255,255,.4); }
-.pile .cnt { position: absolute; bottom: -24px; left: 0; right: 0; text-align: center; color: var(--testo-2); font-size: 12px; white-space: nowrap; }
+.pile .cnt { position: absolute; top: -10px; right: -10px; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: var(--avorio); color: var(--inchiostro); font-weight: 900; font-size: 14px; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 3; font-family: var(--font-body); }
+.pile .cnt:empty { display: none; }
+.pile.t1 .cnt { background: #8ec1dc; } .pile.t0 .cnt { background: var(--oro-2); }
 .pile.t0 { border-color: rgba(217,166,33,.35); } .pile.t1 { border-color: rgba(47,111,143,.5); }
 
 /* giocatori */
@@ -282,7 +284,7 @@ input { font: inherit; }
   .home .tag { margin-bottom: 20px; }
   .vbtn .lbl { display: none; }
   .vbtn.ptt .lbl { display: inline; }
-  .target { display: none; }
+  .goal { display: none; }
   .code { font-size: 32px; }
   .seats { grid-template-columns: 1fr; }
 }
