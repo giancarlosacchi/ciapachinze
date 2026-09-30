@@ -1,9 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1e2a33"/>
-  <g transform="rotate(9 32 32)">
-    <rect x="16" y="10" width="32" height="44" rx="5" fill="#fbf7ee" stroke="#e9e0cb" stroke-width="2"/>
-    <text x="32" y="40" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="22" fill="#c8202f">15</text>
-    <text x="21" y="20" font-family="system-ui" font-size="8" fill="#c8202f">♦</text>
-    <text x="38" y="51" font-family="system-ui" font-size="8" fill="#c8202f">♥</text>
-  </g>
+  <rect width="64" height="64" rx="14" fill="#fbf7ee"/>
+  <rect x="3" y="3" width="58" height="58" rx="12" fill="none" stroke="#e9e0cb" stroke-width="2"/>
+  <text x="32" y="45" text-anchor="middle" font-family="'Nunito Sans','Arial Black',Arial,sans-serif" font-weight="900" font-size="36" fill="#c8202f">15</text>
+  <path d="M11 13 C8 10 6.5 8.5 6.5 6.7 A2.3 2.3 0 0 1 11 6 A2.3 2.3 0 0 1 15.5 6.7 C15.5 8.5 14 10 11 13Z" fill="#c8202f"/>
+  <path d="M53 51 L57.5 56 L53 61 L48.5 56Z" fill="#c8202f"/>
 </svg>

@@ -2,6 +2,7 @@
 (() => {
 'use strict';
 const C = Cirulla;
+const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -162,9 +163,12 @@ const Host = {
   game: null, players: [], conns: new Map(), started: false,
   init(cfg, name, solo) {
     this.players = []; this.conns = new Map(); this.started = false; this.game = null;
-    this.cfg = cfg;
+    this.cfg = cfg; this.arcade = cfg.arcade || null;
     this.addPlayer({ name, token, peerId: null, online: true, bot: false, local: true });
-    if (solo) for (let i = 1; i < cfg.players; i++) this.addPlayer({ name: ['Bacci', 'Rina', 'Tugnin'][i - 1] + ' (pc)', token: 'bot' + i, peerId: null, online: true, bot: true });
+    if (solo) {
+      const names = cfg.botNames || ['Bacci', 'Rina', 'Tugnin'];
+      for (let i = 1; i < cfg.players; i++) this.addPlayer({ name: names[i - 1] + (cfg.arcade ? '' : ' (pc)'), token: 'bot' + i, peerId: null, online: true, bot: true, level: cfg.botLevel != null ? cfg.botLevel : 1 });
+    }
   },
   addPlayer(p, seat) {
     if (seat == null) { seat = 0; while (this.players.some(x => x.seat === seat)) seat++; }
@@ -262,6 +266,7 @@ const Host = {
     for (let i = 0; i < this.cfg.players; i++) if (!this.players.some(p => p.seat === i)) this.addBot(i);
     const names = []; for (let i = 0; i < this.cfg.players; i++) names[i] = (this.players.find(p => p.seat === i) || {}).name || 'Pc';
     this.game = C.newGame({ players: this.cfg.players, target: this.cfg.target, names });
+    if (this.arcade && this.arcade.handicap) this.game.scores[1] = this.arcade.handicap;
     this.started = true;
     C.startDeal(this.game);
     this.broadcastLobby();
@@ -285,6 +290,12 @@ const Host = {
     }
     if (g.turn !== seat) return;
     const hand = g.hands[seat];
+    const pl = this.players.find(p => p.seat === seat);
+    const level = pl && pl.level != null ? pl.level : 1;
+    if (root_Arcade()) {
+      const mv = root_Arcade().chooseMove(g, seat, level, Math.random);
+      if (mv) { const r = C.play(g, seat, mv.card, mv.idx); if (r.ok) { this.pushViews(); this.afterMove(); return; } }
+    }
     let best = null;
     for (const card of hand) {
       const opts = C.optionsFor(g, seat, card);
@@ -462,6 +473,7 @@ function onView(view, roster) {
 async function processQueue() {
   processing = true;
   if ($('#game').classList.contains('hidden')) { showScreen('game'); Stage.init(); }
+  $('#game').classList.toggle('novoice', App.mode === 'solo');
   while (queue.length) {
     const { view, events } = queue.shift();
     // lo stato di riferimento per la simulazione: l'ultima vista
@@ -471,6 +483,7 @@ async function processQueue() {
     App.view = view;
     Stage.render(view);
     renderTop(view); renderPlayers(view); Side.refresh();
+    if (App.arcade) ArcadeUI.goalbar(); else { const gb = $('#goalbar'); if (gb) gb.classList.add('hidden'); }
     if (view.phase === 'dealEnd' || view.phase === 'gameEnd') { await sleep(400); showDealEnd(view); }
     if (view.pendingBuona && view.pendingBuona.options) showBuonaChoice(view.pendingBuona);
     if (view.phase === 'play' && view.turn === App.mySeat && !view.pendingBuona) Sound.play('turn');
@@ -480,7 +493,7 @@ async function processQueue() {
 
 function renderTop(view) {
   const myTeam = C.teamOf(view, App.mySeat);
-  const nm = t => App.cfg.players === 4 ? (t === myTeam ? 'Noi' : 'Loro') : (t === myTeam ? 'Tu' : (view.names[view.teams[t][0]] || 'Loro').split(' ')[0]);
+  const nm = t => view.cfg.players === 4 ? (t === myTeam ? 'Noi' : 'Loro') : (t === myTeam ? 'Tu' : (view.names[view.teams[t][0]] || 'Loro').split(' ')[0]);
   $('#sc-n0').textContent = nm(myTeam); $('#sc-0').textContent = view.scores[myTeam];
   $('#sc-n1').textContent = nm(1 - myTeam); $('#sc-1').textContent = view.scores[1 - myTeam];
   $('#sc-target').textContent = 'a ' + view.cfg.target;
@@ -1099,6 +1112,14 @@ function showBuonaChoice(pb) {
 function showDealEnd(view) {
   if ($('#end-modal')) return;
   const d = view.lastDeal; if (!d) return;
+  if (App.arcade && ArcadeUI.stage) {
+    const finished = ArcadeUI.onDealEnd(view);
+    if (finished) { ArcadeUI.showResult(view); return; }
+    showDealEndTable(view, d, true); return;
+  }
+  showDealEndTable(view, d, false);
+}
+function showDealEndTable(view, d, arcadeContinue) {
   const my = C.teamOf(view, App.mySeat), ot = 1 - my;
   const names = t => view.cfg.players === 4 ? view.teams[t].map(s => view.names[s]).join(' & ') : view.names[view.teams[t][0]];
   const rows = [['Carte', 'carte', t => `${d.teams[t].nCarte}`], ['Denari ♦', 'denari', t => `${d.teams[t].nDenari}`], ['Settebello', 'settebello', () => ''], ['Primiera', 'primiera', t => `${d.teams[t].primieraVal}`], ['Scope e buone', 'scope', () => ''], ['Grande', 'grande', () => ''], ['Piccola', 'piccola', () => '']];
@@ -1117,7 +1138,7 @@ function showDealEnd(view) {
     ${gameOver ? `<button class="btn" id="end-again">Nuova partita</button>` : `<button class="btn" id="end-next">${App.mode === 'guest' ? 'Pronto per la prossima' : 'Prossima smazzata'}</button>`}</div>`;
   const m = modal(html, { closable: false }); m.id = 'end-modal';
   m.querySelector('.modal').classList.add(gameOver ? (iWon ? 'won' : 'lost') : 'deal');
-  if (gameOver && App.mode !== 'solo') {
+  if (gameOver && App.mode !== 'solo' && !App.arcade) {
     const opp = view.teams[ot].map(sIdx => view.names[sIdx]);
     const rec = Record.add(opp, iWon);
     if (rec) { const p = document.createElement('p'); p.className = 'record'; p.innerHTML = `Con <b>${esc(rec.name)}</b>: ${rec.w} vint${rec.w === 1 ? 'a' : 'e'} · ${rec.l} pers${rec.l === 1 ? 'a' : 'e'}`; m.querySelector('.actions').before(p); }
@@ -1127,7 +1148,7 @@ function showDealEnd(view) {
   m.querySelector('#end-prese').onclick = () => { m.classList.add('hidden'); Stage.reviewCaptured(true); };
   m.querySelector('#end-prese').title = 'Si possono guardare solo a fine smazzata';
   $('#review-close').onclick = () => { Stage.reviewCaptured(false); m.classList.remove('hidden'); };
-  const nb = m.querySelector('#end-next'); if (nb) nb.onclick = () => { nb.disabled = true; nb.textContent = 'In attesa…'; Client.send({ t: 'next' }); };
+  const nb = m.querySelector('#end-next'); if (nb) nb.onclick = () => { nb.disabled = true; nb.textContent = 'In attesa…'; Client.send({ t: 'next' }); if (arcadeContinue) setTimeout(() => ArcadeUI.goalbar(), 100); };
   const ab = m.querySelector('#end-again'); if (ab) ab.onclick = () => { Client.send({ t: 'again' }); m.remove(); };
   // il modale viene chiuso all'arrivo della nuova smazzata
   const obs = () => { if (App.view && App.view.phase === 'play') { m.remove(); } else requestAnimationFrame(obs); };
@@ -1310,12 +1331,22 @@ seg('#seg-players', v => App.cfg.players = +v);
 seg('#seg-target', v => App.cfg.target = +v);
 const savedName = localStorage.getItem('cpz-name') || '';
 $('#host-name').value = savedName; $('#join-name').value = savedName;
+function applyName() {
+  const n = (localStorage.getItem('cpz-name') || '').trim();
+  $$('.name-field').forEach(f => f.classList.toggle('hidden', !!n));
+  $('#hello').classList.toggle('hidden', !n);
+  if (n) { $('#hello-name').textContent = n; $('#host-name').value = n; $('#join-name').value = n; }
+}
+applyName();
+$('#btn-change-name').onclick = () => { localStorage.removeItem('cpz-name'); $('#host-name').value = ''; $('#join-name').value = ''; applyName(); $('#host-name').focus(); };
+const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || localStorage.getItem('cpz-name') || '').trim();
 const hashCode = (location.hash || '').replace('#', '').toUpperCase();
 if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; setTimeout(() => $('#join-name').focus(), 100); }
 
-$('#btn-host').onclick = () => { const name = $('#host-name').value.trim() || 'Ospite'; localStorage.setItem('cpz-name', name); hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, false); };
-$('#btn-solo').onclick = () => { const name = $('#host-name').value.trim() || $('#join-name').value.trim() || 'Tu'; localStorage.setItem('cpz-name', name); hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, true); };
-$('#btn-join').onclick = () => { const name = $('#join-name').value.trim() || 'Ospite'; const code = $('#join-code').value.trim().toUpperCase(); if (!/^[A-Z0-9]{6}$/.test(code)) { $('#join-status').textContent = 'Inserisci il codice di 6 caratteri.'; return; } localStorage.setItem('cpz-name', name); joinRoom(code, name); };
+function needName(input) { const n = myName(); if (!n) { $$('.name-field').forEach(f => f.classList.remove('hidden')); input.focus(); toast('Scrivi prima il tuo nome'); return null; } localStorage.setItem('cpz-name', n); applyName(); return n; }
+$('#btn-host').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, false); };
+$('#btn-solo').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, true); };
+$('#btn-join').onclick = () => { const code = $('#join-code').value.trim().toUpperCase(); if (!/^[A-Z0-9]{6}$/.test(code)) { $('#join-status').textContent = 'Inserisci il codice di 6 caratteri.'; return; } const name = needName($('#join-name')); if (name) joinRoom(code, name); };
 $('#join-code').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-join').click(); });
 $('#btn-rules-home').onclick = () => modal(RULES_HTML);
 $('#btn-settings-home').onclick = () => openSettings();
@@ -1348,6 +1379,7 @@ $('#btn-copy-code').onclick = () => navigator.clipboard.writeText(App.code).then
 $('#btn-copy-link').onclick = () => navigator.clipboard.writeText(inviteLink()).then(() => toast('Link copiato: mandalo agli amici'));
 if (navigator.share) { $('#btn-share').style.display = ''; $('#btn-share').onclick = () => navigator.share({ title: 'Ciapachinze', text: `Vieni a giocare a cirulla! Codice tavolo ${App.code}`, url: inviteLink() }).catch(() => {}); }
 $('#btn-side').onclick = () => Side.open();
+$('#game .wordmark').onclick = () => { if (App.mode === 'solo') { const m = modal(`<h2>Lasciare il tavolo?</h2><div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Resta</button><button class="btn" id="leave-yes">Esci</button></div>`); m.querySelector('#leave-yes').onclick = () => { m.remove(); const wasArcade = !!App.arcade; ArcadeUI.leave(); App.mode = null; showScreen(wasArcade ? 'scr-arcade' : 'scr-home'); if (wasArcade) ArcadeUI.open(); }; } };
 $('#btn-side-close').onclick = () => Side.close();
 $$('.tabs button').forEach(b => b.onclick = () => Side.setTab(b.dataset.tab));
 $('#chat-send').onclick = () => { const i = $('#chat-input'); const t = i.value.trim(); if (!t) return; Client.send({ t: 'chat', text: t }); i.value = ''; };
@@ -1371,5 +1403,118 @@ window.addEventListener('keyup', e => { if (e.code === 'Space' && Voice.mode ===
 window.addEventListener('blur', () => Voice.pttEnd());
 window.addEventListener('beforeunload', () => { if (App.mode === 'host' && Host.players.length > 1) Host.broadcast({ t: 'bye' }); });
 Voice.ui();
-window.__cpz = { App, Host, Client, Stage, Voice, C, busy: () => processing || queue.length > 0 };
+/* =====================================================================
+   ARCADE: mappa, tappe, obiettivi, traguardi
+   ===================================================================== */
+const ArcadeUI = {
+  prog: null, stage: null, dealsPlayed: 0, goalDone: false, bonusDone: false,
+  open() { this.prog = Arcade.load(); this.renderMap(); showScreen('scr-arcade'); },
+  homeProgress() {
+    const p = Arcade.load(); const done = p.stats.stagesDone, tot = Arcade.STAGES.length, stars = Arcade.totalStars(p);
+    $('#arcade-progress').innerHTML = `<span>${done}/${tot} tappe</span><div class="bar"><i style="width:${Math.round(done / tot * 100)}%"></i></div><span>★ ${stars}</span>`;
+    $('#btn-arcade').textContent = done === 0 ? 'Parti da Ventimiglia' : done >= tot ? 'Rigioca il giro' : 'Continua il giro';
+  },
+  renderMap() {
+    const p = this.prog; $('#stars-total').textContent = `★ ${Arcade.totalStars(p)} / ${Arcade.STAGES.length * 3}`;
+    const map = $('#map'); map.innerHTML = '';
+    let nextFound = false;
+    Arcade.ZONES.forEach((z, zi) => {
+      const zone = document.createElement('div'); zone.className = 'zone';
+      zone.innerHTML = `<h3><i style="background:${z.color}"></i>${esc(z.name)}</h3><div class="stages"></div>`;
+      const grid = zone.querySelector('.stages');
+      Arcade.STAGES.filter(st => st.zone === zi).forEach(st => {
+        const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlocked(p, st.id);
+        const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
+        const b = document.createElement('button'); b.className = 'stage' + (stars ? ' done' : '') + (isNext ? ' next' : ''); b.disabled = !unlocked;
+        b.innerHTML = `<span class="n">Tappa ${st.id} · ${st.players === 4 ? '2 vs 2' : '1 vs 1'}</span><span class="town">${esc(st.town)}</span><span class="who">${esc(st.who)}</span><span class="st">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></span>${unlocked ? '' : '<span class="lock">🔒</span>'}`;
+        b.onclick = () => this.brief(st);
+        grid.appendChild(b);
+      });
+      map.appendChild(zone);
+    });
+  },
+  brief(st) {
+    const stars = this.prog.stars[st.id] || 0;
+    const m = modal(`<h2>${esc(st.town)}<small>Tappa ${st.id} · contro ${esc(st.who)}</small></h2>
+      <p>${esc(st.intro)}</p>
+      <div class="opt" style="cursor:default"><span style="font-size:22px">🎯</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
+      <div class="opt" style="cursor:default"><span style="font-size:22px">🌟</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
+      <p style="font-size:13px">Difficoltà del computer: ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]} · ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} finora</p>
+      <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">Gioca</button></div>`);
+    m.querySelector('#stage-go').onclick = () => { m.remove(); this.start(st); };
+  },
+  start(st) {
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
+    const names = st.players === 4 ? [st.who.split(' ')[0].replace(/^(il|la|lo|i|le|l')$/i, st.who), 'Compagno', st.who] : [st.who];
+    const botNames = st.players === 4 ? ['Avversario 1', 'Il tuo compagno', 'Avversario 2'] : [st.who];
+    if (st.players === 4) { botNames[0] = st.who; botNames[2] = st.who + ' 2'; }
+    App.seenEventId = 0; App.view = null;
+    hostRoom({ players: st.players, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0 }, botLevel: st.level, botNames }, localStorage.getItem('cpz-name') || 'Tu', true);
+    App.mode = 'solo'; App.arcade = st;
+    setTimeout(() => this.goalbar(), 50);
+  },
+  goalbar() {
+    let g = $('#goalbar'); if (!g) { g = document.createElement('div'); g.id = 'goalbar'; g.className = 'goalbar'; $('#stage-wrap').appendChild(g); }
+    const st = this.stage; if (!st) { g.classList.add('hidden'); return; }
+    g.classList.remove('hidden');
+    g.innerHTML = `🎯 <b>${esc(Arcade.goalText(st.goal))}</b>${st.deals ? ` · smazzata ${this.dealsPlayed + 1}/${st.deals}` : ''}`;
+  },
+  /* chiamato a fine smazzata (solo mode arcade) → ritorna true se la tappa è finita */
+  onDealEnd(view) {
+    const st = this.stage; if (!st) return false;
+    const my = C.teamOf(view, App.mySeat), ot = 1 - my; const d = view.lastDeal;
+    const mySeats = view.teams[my];
+    const won = view.phase === 'gameEnd' && view.winner === my;
+    const ctx = { deal: d, my, ot, mySeats, scores: view.scores, won };
+    this.dealsPlayed++;
+    if (Arcade.goalCheck(st.goal, ctx)) this.goalDone = true;
+    if (Arcade.goalCheck(st.bonus, ctx)) this.bonusDone = true;
+    const margin = d.teams[my].total - d.teams[ot].total; if (margin > this.marginBest) this.marginBest = margin;
+    const fresh = Arcade.recordDeal(this.prog, d, my, mySeats);
+    this.toastAch(fresh);
+    const finished = st.deals ? (this.goalDone || this.dealsPlayed >= st.deals) : (view.phase === 'gameEnd');
+    if (!finished) { this.goalbar(); return false; }
+    // stelle: 1 obiettivo, 2 obiettivo con margine (o partita vinta con >5 di scarto), 3 anche il bonus
+    let stars = 0;
+    if (this.goalDone) { stars = 1; if (this.marginBest >= 4 || (won && view.scores[my] - view.scores[ot] >= 6)) stars = 2; if (this.bonusDone) stars = 3; }
+    const fresh2 = Arcade.recordStage(this.prog, st, stars);
+    this.toastAch(fresh2);
+    this.result = { stars, won: stars > 0 };
+    return true;
+  },
+  toastAch(list) {
+    (list || []).forEach((a, i) => setTimeout(() => {
+      const t = document.createElement('div'); t.className = 'ach-toast'; t.innerHTML = `<span class="ic">${a.icon}</span><div><b>Traguardo: ${esc(a.name)}</b><small>${esc(a.desc)}</small></div>`;
+      document.body.appendChild(t); Sound.play('scopa'); setTimeout(() => t.remove(), 3800);
+    }, i * 1200));
+  },
+  showResult(view) {
+    const st = this.stage, r = this.result; const nextSt = Arcade.STAGES.find(x => x.id === st.id + 1);
+    const m = modal(`<h2>${r.won ? 'Tappa superata!' : 'Tappa fallita'}<small>${esc(st.town)} · ${esc(st.who)}</small></h2>
+      <div class="stars-big">${'★'.repeat(r.stars)}<span class="off">${'★'.repeat(3 - r.stars)}</span></div>
+      <p style="text-align:center">${r.won ? (r.stars === 3 ? 'Perfetto: obiettivo e terza stella.' : r.stars === 2 ? 'Obiettivo centrato con margine.' : 'Obiettivo centrato.') : 'Obiettivo mancato: ' + esc(Arcade.goalText(st.goal)) + '.'}</p>
+      <div class="actions"><button class="btn ghost" id="res-map">Mappa</button><button class="btn" id="res-retry">${r.won ? 'Rigioca' : 'Riprova'}</button>${r.won && nextSt ? `<button class="btn oro" id="res-next">Prossima: ${esc(nextSt.town)}</button>` : ''}</div>`, { closable: false });
+    m.querySelector('.modal').classList.add(r.won ? 'won' : 'lost');
+    if (r.won) Stage.sparks();
+    m.querySelector('#res-map').onclick = () => { m.remove(); this.leave(); this.open(); };
+    m.querySelector('#res-retry').onclick = () => { m.remove(); this.leave(); this.start(st); };
+    const nb = m.querySelector('#res-next'); if (nb) nb.onclick = () => { m.remove(); this.leave(); this.start(nextSt); };
+  },
+  leave() {
+    this.stage = null; App.arcade = null; App.view = null; App.seenEventId = 0;
+    clearTimeout(Host.botTimer); Host.game = null;
+    Stage.nodes.forEach(n => n.remove()); Stage.nodes.clear(); Stage.playerEls.forEach(e => e.remove()); Stage.playerEls.clear();
+    $$('#modals .modal-bg').forEach(x => x.remove());
+    const g = $('#goalbar'); if (g) g.classList.add('hidden');
+    this.homeProgress();
+  },
+};
+$('#btn-arcade').onclick = () => ArcadeUI.open();
+$('#arcade-back').onclick = () => { showScreen('scr-home'); ArcadeUI.homeProgress(); };
+$('#btn-achievements').onclick = () => {
+  const p = Arcade.load();
+  modal(`<h2>Traguardi<small>${p.unlocked.length} su ${Arcade.ACHIEVEMENTS.length}</small></h2><div class="ach-grid">${Arcade.ACHIEVEMENTS.map(a => `<div class="ach ${p.unlocked.includes(a.id) ? '' : 'locked'}"><div class="ic">${a.icon}</div><div class="nm">${esc(a.name)}</div><div class="ds">${esc(a.desc)}</div></div>`).join('')}</div><div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Chiudi</button></div>`);
+};
+ArcadeUI.homeProgress();
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, busy: () => processing || queue.length > 0 };
 })();
