@@ -444,14 +444,14 @@ const Stage = {
     const n = view.cfg.players, W = this.W, H = this.H, cw = this.cw(), ch = this.ch();
     if (this.mobile) {
       // smartphone: la mia mano in basso, tutti gli avversari in alto (sinistra / centro / destra)
-      if (rel === 0) return { x: W / 2, y: H - ch / 2 - 10, rot: 0, dir: 'h' };
-      const top = ch / 2 + 44;
+      if (rel === 0) return { x: W / 2 + 16, y: H - ch / 2 - 10, rot: 0, dir: 'h' };
+      const top = ch / 2 + 58;
       if (n === 2 || rel === 2) return { x: W / 2, y: top, rot: 0, dir: 'h', compact: true };
       if (rel === 1) return { x: W - cw * .85 - 10, y: top, rot: -12, dir: 'h', compact: true };
       return { x: cw * .85 + 10, y: top, rot: 12, dir: 'h', compact: true };
     }
     if (rel === 0) return { x: W / 2, y: H - ch / 2 - 18, rot: 0, dir: 'h' };
-    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + 16, rot: 0, dir: 'h' };
+    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + 40, rot: 0, dir: 'h' };
     if (rel === 1) return { x: W - ch / 2 - 16, y: H / 2, rot: -90, dir: 'v' };
     return { x: ch / 2 + 16, y: H / 2, rot: 90, dir: 'v' };
   },
@@ -466,7 +466,7 @@ const Stage = {
     // il mazzetto sta sempre alla sinistra di chi ha preso: il mio in basso a sinistra, il loro a destra delle loro carte
     if (this.mobile) {
       const top = this.seatAnchor(view.cfg.players === 4 ? 1 : 1, view);
-      return team === my ? { x: 8, y: this.H - ch * k - 26 } : { x: this.W - cw * k - 8, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
+      return team === my ? { x: 6, y: this.H - ch * k - 52 } : { x: this.W - cw * k - 8, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
     }
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
@@ -526,7 +526,8 @@ const Stage = {
     for (let t = 0; t < 2; t++) {
       const pp = this.pilePos(t, view), k = this.pileScale(), cw = this.cw(), ch = this.ch();
       // le scope spuntano da sotto il mazzetto: si vede solo un angolo
-      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + cw * k * .34 + i * 5, y: pp.y - ch * k * .22 - i * 4, rot: 16 + i * 6, z: 1, scale: k, scopa: true }));
+      // le scope spuntano verso l'alto, ben strette: anche con molte scope non escono dall'angolo del mazzetto
+      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + cw * k * .18 + Math.min(i, 8) * 1.5, y: pp.y - ch * k * .26 - Math.min(i, 8) * 3, rot: 8 + (i % 3) * 3, z: 1, scale: k, scopa: true }));
     }
     return items;
   },
@@ -729,9 +730,7 @@ const Stage = {
       });
     }
     this.focus(opts.length === 1 ? 0 : null);
-    ch.classList.remove('hidden');
-    const slots = this.tableSlots(Math.max(1, view.table.length));
-    ch.style.top = Math.max(8, slots[0].y - 54) + 'px';
+    ch.classList.add('hidden');   // nessuna scritta sopra il campo: parlano solo le carte illuminate
     this.setHint('', false);
   },
   /* riquadro di scelta tra più prese (dopo il rilascio in campo) */
@@ -969,18 +968,21 @@ function renderPlayers(view) {
     el.classList.toggle('hidden', Stage.mobile && rel === 0);
     el.classList.toggle('compact', !!a.compact);
     el.title = sub;
+    el.classList.toggle('behind', rel !== 0 && a.dir === 'h');
     if (a.compact) {
-      el.style.top = `${a.y + ch * .5 + 4}px`; el.style.transform = '';
+      // dietro le carte: spunta sopra il bordo superiore
+      el.style.top = `${a.y - ch * .5 - 34}px`; el.style.transform = '';
       if (rel === 1 && n === 4) { el.style.left = ''; el.style.right = '8px'; }
       else if (rel === 3) el.style.left = '8px';
-      else { el.style.left = '50%'; el.style.transform = 'translateX(-50%)'; }
+      else { el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)'; }
+    } else if (a.dir === 'h' && rel !== 0) {
+      el.style.top = `${a.y - ch / 2 - 46}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
     } else if (a.dir === 'h') {
       el.style.transform = '';
-      // accanto alla mano (a destra), leggermente sopra il bordo delle carte
-      const half = rel === 0 ? cw * 1.12 * 1.5 : cw * 0.55 * 1.5;
+      // accanto alla mia mano, a sinistra
+      const half = cw * 1.12 * 1.5;
       el.style.top = `${a.y - 20}px`;
-      if (rel === 0) { el.style.left = ''; el.style.right = `${Stage.W - (a.x - half - 14)}px`; el.style.transform = ''; }
-      else el.style.left = `${a.x + half + 14}px`;
+      el.style.left = ''; el.style.right = `${Stage.W - (a.x - half - 14)}px`;
     } else {
       el.style.transform = '';
       // sotto la mano verticale

@@ -167,6 +167,8 @@ input { font: inherit; }
 .player .avatar::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid transparent; }
 .player .mic { font-size: 12px; opacity: .7; }
 .player.offline { opacity: .5; }
+.player.behind { z-index: 1; padding-bottom: 22px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.player.behind.compact { padding: 3px 8px 18px 3px; }
 .player.team0 .avatar { background: var(--oro-2); } .player.team1 .avatar { background: #8ec1dc; }
 
 /* opzioni presa */
