@@ -463,7 +463,11 @@ const Stage = {
   pileScale() { return this.mobile ? .72 : 1; },
   pilePos(team, view) {
     const my = C.teamOf(view, App.mySeat), cw = this.cw(), ch = this.ch(), k = this.pileScale();
-    if (this.mobile) return team === my ? { x: 8, y: this.H - ch * k - 26 } : { x: this.W - cw * k - 8, y: this.H / 2 - ch * k / 2 - 40 };
+    // il mazzetto sta sempre alla sinistra di chi ha preso: il mio in basso a sinistra, il loro a destra delle loro carte
+    if (this.mobile) {
+      const top = this.seatAnchor(view.cfg.players === 4 ? 1 : 1, view);
+      return team === my ? { x: 8, y: this.H - ch * k - 26 } : { x: this.W - cw * k - 8, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
+    }
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
   tableSlots(count) {
