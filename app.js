@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010738';
+const APP_VERSION = '202610010750';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -522,6 +522,7 @@ async function processQueue() {
   processing = true;
   if ($('#game').classList.contains('hidden')) { showScreen('game'); Stage.init(); }
   $('#game').classList.toggle('novoice', App.mode === 'solo');
+  updateOrientation();
   while (queue.length) {
     const { view, events } = queue.shift();
     // lo stato di riferimento per la simulazione: l'ultima vista
@@ -572,35 +573,40 @@ const Stage = {
   ch() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--card-h')); },
   rel(seat, view) { const n = view.cfg.players; return (seat - App.mySeat + n) % n; },
   /* posizione dei posti relativi: 0 = io (basso), 4p: 1 destra, 2 alto, 3 sinistra; 2p: 1 alto */
-  get mobile() { return this.W < 640; },
+  // "mobile" = telefono in verticale. In orizzontale (2 vs 2) si usa la disposizione a quattro lati.
+  get mobile() { return this.W < 640 && this.W <= this.H; },
+  get landscape() { return this.W > this.H && this.H < 520; },
   seatAnchor(rel, view) {
     const n = view.cfg.players, W = this.W, H = this.H, cw = this.cw(), ch = this.ch();
     if (this.mobile) {
       // smartphone: la mia mano in basso, tutti gli avversari in alto (sinistra / centro / destra)
-      if (rel === 0) return { x: W / 2 + 16, y: H - ch / 2 - 10, rot: 0, dir: 'h' };
+      if (rel === 0) return { x: W / 2 + 8, y: H - ch / 2 - 10, rot: 0, dir: 'h' };
       const top = ch / 2 + 40;
       if (n === 2 || rel === 2) return { x: W / 2, y: top, rot: 0, dir: 'h', compact: true };
       if (rel === 1) return { x: W - cw * .85 - 10, y: top, rot: -12, dir: 'h', compact: true };
       return { x: cw * .85 + 10, y: top, rot: 12, dir: 'h', compact: true };
     }
-    if (rel === 0) return { x: W / 2, y: H - ch / 2 - 18, rot: 0, dir: 'h' };
-    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + 22, rot: 0, dir: 'h' };
-    if (rel === 1) return { x: W - ch / 2 - 16, y: H / 2, rot: -90, dir: 'v' };
-    return { x: ch / 2 + 16, y: H / 2, rot: 90, dir: 'v' };
+    const L = this.landscape;
+    if (rel === 0) return { x: W / 2, y: H - ch / 2 - (L ? 6 : 18), rot: 0, dir: 'h' };
+    if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + (L ? 6 : 22), rot: 0, dir: 'h' };
+    if (rel === 1) return { x: W - ch / 2 - (L ? 10 : 16), y: H / 2 - (L ? 14 : 0), rot: -90, dir: 'v' };
+    return { x: ch / 2 + (L ? 10 : 16), y: H / 2 - (L ? 14 : 0), rot: 90, dir: 'v' };
   },
   deckPos() {
     const cw = this.cw(), ch = this.ch(); const n = App.view ? App.view.cfg.players : 2;
     if (this.mobile) return { x: 12, y: -ch / 2 };
+    if (this.landscape) return { x: 12, y: 10, scale: .62 };
     return n === 4 ? { x: 26, y: 80 } : { x: 34, y: this.H / 2 - ch / 2 };
   },
-  pileScale() { return this.mobile ? .72 : 1; },
+  pileScale() { return this.mobile ? .58 : this.landscape ? .8 : 1; },
   pilePos(team, view) {
     const my = C.teamOf(view, App.mySeat), cw = this.cw(), ch = this.ch(), k = this.pileScale();
     // il mazzetto sta sempre alla sinistra di chi ha preso: il mio in basso a sinistra, il loro a destra delle loro carte
     if (this.mobile) {
       const top = this.seatAnchor(view.cfg.players === 4 ? 1 : 1, view);
-      return team === my ? { x: 6, y: this.H - ch * k - 52 } : { x: this.W - cw * k - 30, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
+      return team === my ? { x: 6, y: this.H - ch * k - ch * 1.9 } : { x: this.W - cw * k - 30, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
     }
+    if (this.landscape) return team === my ? { x: 14, y: this.H - ch * k - 8 } : { x: this.W - cw * k - 14, y: 10 };
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
   tableSlots(count) {
@@ -662,7 +668,7 @@ const Stage = {
       // le scope spuntano verso l'alto, ben strette: anche con molte scope non escono dall'angolo del mazzetto
       // le scope spuntano da sotto: verso l'interno del campo per il mazzetto avversario, mai oltre il bordo
       const theirs = t !== C.teamOf(view, App.mySeat);
-      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + (theirs ? -cw * k * .22 - Math.min(i, 8) * 1.5 : cw * k * .18 + Math.min(i, 8) * 1.5), y: pp.y - ch * k * .26 - Math.min(i, 8) * 3, rot: theirs ? -8 - (i % 3) * 3 : 8 + (i % 3) * 3, z: 1, scale: k, scopa: true }));
+      (view.scopeCards[t] || []).forEach((id, i) => items.push({ key: 'sc:' + id, id, face: true, x: pp.x + (theirs ? -cw * k * .14 - Math.min(i, 8) * 1.2 : cw * k * .12 + Math.min(i, 8) * 1.2), y: pp.y - ch * k * .16 - Math.min(i, 8) * 2.2, rot: theirs ? -6 - (i % 3) * 2 : 6 + (i % 3) * 2, z: 1, scale: k, scopa: true }));
     }
     return items;
   },
@@ -753,7 +759,7 @@ const Stage = {
     }
     // mazzo e mazzetti
     const dp = this.deckPos(); const deck = $('#deck');
-    deck.style.left = dp.x + 'px'; deck.style.top = dp.y + 'px';
+    deck.style.left = dp.x + 'px'; deck.style.top = dp.y + 'px'; deck.style.transform = dp.scale ? `scale(${dp.scale})` : '';
   },
   render(view) {
     this.measure();
@@ -763,7 +769,7 @@ const Stage = {
     const mob = this.mobile;
     $('#deck').classList.toggle('hidden', mob); $('#mstrip').classList.toggle('hidden', !mob);
     if (mob) { $('#ms-deck').textContent = `${view.deckCount} nel mazzo`; $('#mstrip').classList.toggle('low', view.cfg.players === 4); }
-    const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount ? `${view.deckCount} carte nel mazzo` : 'mazzo finito';
+    const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount ? (this.landscape ? `${view.deckCount}` : `${view.deckCount} carte nel mazzo`) : (this.landscape ? '' : 'mazzo finito');
     deck.style.opacity = view.deckCount ? 1 : .25;
     const my = C.teamOf(view, App.mySeat);
     for (let t = 0; t < 2; t++) {
@@ -807,7 +813,7 @@ const Stage = {
   arc(view) {
     const a = this.seatAnchor(0, view || App.view), ch = this.ch(), cw = this.cw();
     const cx = this.W / 2, cy = a.y + ch * .9;
-    const R = Math.min(this.W * .48, this.mobile ? ch * 1.75 + 24 : ch * 1.7 + 60);
+    const R = Math.min(this.W * .48, this.mobile ? ch * 1.75 + 24 : this.landscape ? ch * 1.45 + 30 : ch * 1.7 + 60);
     const t1 = Math.PI * (this.mobile ? .93 : .87), t2 = Math.PI - t1;
     const p = t => ({ x: cx + R * Math.cos(t), y: cy - R * Math.sin(t) });
     const s = p(t1), e = p(t2);
@@ -1086,14 +1092,18 @@ const Stage = {
     }
   },
   fx(text, sub, cls = '') {
-    $$('.fx').forEach(x => x.remove());
-    const d = document.createElement('div'); d.className = 'fx ' + cls; d.innerHTML = `<span class="t">${esc(text)}</span>` + (sub ? `<small>${esc(sub)}</small>` : '');
-    this.wrap.appendChild(d);
+    $$('.fxwrap').forEach(x => x.remove());
+    const w = document.createElement('div'); w.className = 'fxwrap';
+    const d = document.createElement('div'); d.className = 'fx ' + cls;
+    const suits = ['♥', '♦', '♣', '♠'];
+    let flying = '';
+    for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2 + Math.random() * .3, r = 120 + Math.random() * 90; flying += `<i style="--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px;--r:${(Math.random() * 360 - 180).toFixed(0)}deg;animation-delay:${(Math.random() * .15).toFixed(2)}s">${suits[i % 4]}</i>`; }
+    d.innerHTML = `<div class="rays"></div><div class="ring"></div><div class="ring r2"></div><div class="suits">${flying}</div><div class="pill"><span class="t">${esc(text)}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+    w.appendChild(d); this.wrap.appendChild(w);
     // il campo dietro si abbassa e si sfoca per un attimo: la scritta resta leggibile
     this.wrap.classList.add('fxon'); clearTimeout(this.fxTimer);
     this.fxTimer = setTimeout(() => this.wrap.classList.remove('fxon'), 1500);
-    if (cls === 'oro') this.sparks(['#ffe39a', '#d9a621', '#fff']); 
-    setTimeout(() => d.remove(), 1950);
+    setTimeout(() => w.remove(), 2050);
   },
   sparks(palette) {
     const colors = palette || ['#d9a621', '#f0c750', '#c8202f', '#f6f0e1', '#7fa36c'];
@@ -1126,7 +1136,7 @@ function renderPlayers(view) {
     el.querySelector('.mic').textContent = Voice.speaking.has(s) ? '🎙' : '';
     const a = Stage.seatAnchor(rel, view), cw = Stage.cw(), ch = Stage.ch();
     el.style.right = '';
-    el.classList.toggle('hidden', Stage.mobile && rel === 0);
+    el.classList.toggle('hidden', (Stage.mobile || Stage.landscape) && rel === 0);
     el.classList.toggle('compact', !!a.compact);
     el.title = sub;
     el.classList.toggle('label', rel !== 0);
@@ -1142,9 +1152,12 @@ function renderPlayers(view) {
       el.style.top = `${a.y - 20}px`;
       el.style.left = ''; el.style.right = `${Stage.W - (a.x - half - 14)}px`;
     } else {
-      // sotto la mano verticale, centrata
+      // mano verticale: etichetta sotto le carte, ma sempre dentro il campo
       const half = cw * 0.55 + ch / 2;
-      el.style.top = `${a.y + half + 10}px`; el.style.left = `${a.x}px`; el.style.transform = 'translateX(-50%)';
+      const top = Math.min(a.y + half + 6, Stage.H - 34);
+      el.style.top = `${top}px`;
+      if (rel === 1) { el.style.left = ''; el.style.right = '8px'; el.style.transform = ''; }
+      else { el.style.left = '8px'; el.style.transform = ''; }
     }
   }
 }
@@ -1610,6 +1623,15 @@ $('#btn-achievements').onclick = () => {
 };
 ArcadeUI.homeProgress();
 Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); } Store.mirror(); });
+/* 2 vs 2 sul telefono: si gioca in orizzontale */
+function updateOrientation() {
+  const four = App.view && App.view.cfg.players === 4;
+  const portraitPhone = window.innerWidth < 640 && window.innerWidth <= window.innerHeight;
+  $('#rotate').classList.toggle('hidden', !(four && portraitPhone));
+  $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
+  if (four && portraitPhone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+}
+window.addEventListener('resize', () => { if (App.view) updateOrientation(); });
 /* aggiornamenti: se online c'è una versione più nuova, ricarica (solo quando non si sta giocando) */
 const Updater = {
   async check(manual) {
