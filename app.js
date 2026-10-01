@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010907';
+const APP_VERSION = '202610010913';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -215,7 +215,7 @@ const token = (() => { let t = Store.get('cpz-token'); if (!t) { t = Math.random
 const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 
 function showScreen(id) {
-  $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); });
+  $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); if (s.id === id) s.scrollTop = 0; });
   $('#game').classList.toggle('hidden', id !== 'game'); $('#game').classList.remove('enter');
   if (showScreen.first) { showScreen.first = false; return; }
   const el = id === 'game' ? $('#game') : $('#' + id); if (el) { void el.offsetWidth; el.classList.add('enter'); }
@@ -786,7 +786,7 @@ const Stage = {
     }
     // mazzo e mazzetti
     const dp = this.deckPos(); const deck = $('#deck');
-    deck.style.left = dp.x + 'px'; deck.style.top = dp.y + 'px'; deck.style.transform = dp.scale ? `scale(${dp.scale})` : '';
+    deck.style.left = dp.x + 'px'; deck.style.top = dp.y + 'px'; deck.style.transform = dp.scale ? `scale(${dp.scale})` : ''; deck.style.setProperty('--deck-k', dp.scale || 1);
   },
   render(view) {
     this.measure();
@@ -851,27 +851,41 @@ const Stage = {
     if (!on) { svg.classList.add('hidden'); return; }
     const a = this.arc();
     svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
-    $('#hint-path').setAttribute('d', a.d);
-    $('#hint-glow').setAttribute('d', a.d);
+    ['#hint-path', '#hint-glow', '#hint-aurora', '#hint-comet', '#hint-comet2'].forEach(id => $(id).setAttribute('d', a.d));
+    // le due "comete" che scorrono lungo l'arco: una scia corta su un tratteggio lungo quanto l'arco
+    const len = a.R * (Math.PI * (this.mobile ? .93 : .87) - Math.PI * (this.mobile ? .07 : .13));
+    [$('#hint-comet'), $('#hint-comet2')].forEach((c, i) => { c.style.strokeDasharray = `${Math.round(len * .14)} ${Math.round(len)}`; c.style.setProperty('--len', len.toFixed(0)); c.style.animationDelay = i ? '-2.1s' : '0s'; });
     $('#hint-text').textContent = text;
     svg.classList.remove('hidden');
   },
-  /* p: 0 = carta ancora in mano, 1 = oltre la linea. La linea passa da tratteggiata a piena con continuità */
-  showDropzone(on, p) {
-    const svg = $('#dropzone'); if (!on) { svg.classList.add('hidden'); return; }
+  /* p: 0 = carta ancora in mano, 1 = oltre la linea. Linea e alone affiorano con continuità; sotto la carta un faro segue il dito */
+  showDropzone(on, p, px, py) {
+    const svg = $('#dropzone'); if (!on) { svg.classList.add('hidden'); this.dzOver = false; return; }
     const a = this.arc();
     svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
-    const path = $('#drop-path'), solid = $('#drop-solid'), fill = $('#drop-fill');
-    path.setAttribute('d', a.d); solid.setAttribute('d', a.d);
-    fill.setAttribute('d', `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`);
+    const path = $('#drop-path'), solid = $('#drop-solid'), fill = $('#drop-fill'), band = $('#drop-band'), spot = $('#drop-spotfill');
+    const region = `${a.d} L ${this.W} ${a.e.y.toFixed(1)} L ${this.W} 0 L 0 0 L 0 ${a.s.y.toFixed(1)} Z`;
+    path.setAttribute('d', a.d); solid.setAttribute('d', a.d); band.setAttribute('d', a.d);
+    fill.setAttribute('d', region); spot.setAttribute('d', region);
     p = clamp(p || 0, 0, 1);
     const e = p * p * (3 - 2 * p);   // curva morbida
-    // la linea piena si sovrappone a quella tratteggiata e affiora gradualmente
     solid.style.opacity = e.toFixed(3);
-    solid.style.strokeWidth = (3 + 2.5 * e).toFixed(2);
-    solid.style.filter = e > .5 ? `drop-shadow(0 0 ${(10 * (e - .5) / .5).toFixed(1)}px rgba(190,230,170,.9))` : 'none';
-    path.style.opacity = (1 - .6 * e).toFixed(3);
-    fill.style.fill = `rgba(190,230,170,${(.04 + .12 * e).toFixed(3)})`;
+    solid.style.strokeWidth = (2 + 1.5 * e).toFixed(2);
+    band.style.opacity = (.25 + .75 * e).toFixed(3);
+    band.style.strokeWidth = (10 + 16 * e).toFixed(1);
+    path.style.opacity = (1 - .85 * e).toFixed(3);
+    fill.style.fill = `rgba(190,230,170,${(.03 + .07 * e).toFixed(3)})`;
+    const g = $('#drop-spot');
+    if (px != null) { g.setAttribute('cx', px.toFixed(0)); g.setAttribute('cy', py.toFixed(0)); g.setAttribute('r', (this.cw() * (1.6 + .6 * e)).toFixed(0)); spot.style.opacity = (.2 + .8 * e).toFixed(2); }
+    else spot.style.opacity = 0;
+    // scatto "magnetico" quando si supera la linea: un anello che si allarga dal punto in cui si entra
+    const over = p >= 1;
+    if (over && !this.dzOver && px != null) {
+      const pulse = $('#drop-pulse'); pulse.setAttribute('cx', px.toFixed(0)); pulse.setAttribute('cy', py.toFixed(0));
+      pulse.classList.remove('go'); void pulse.getBoundingClientRect(); pulse.classList.add('go');
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
+    this.dzOver = over;
     svg.classList.remove('hidden');
   },
   /* quanto la carta si è avvicinata alla linea: 0 vicino alla mano, 1 sulla linea o oltre */
@@ -999,12 +1013,16 @@ const Stage = {
         drag.moved = true;
         node.classList.add('dragging'); node.style.zIndex = 60;
       }
-      node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy - 28}px) rotate(0deg) rotateY(0deg) scale(1.06)`;
+      // la carta si inclina leggermente nel verso del movimento, come tenuta tra le dita
+      const now = performance.now(), dt = Math.max(8, now - (drag.t || now)), vx = (ev.clientX - (drag.lx ?? ev.clientX)) / dt;
+      drag.t = now; drag.lx = ev.clientX;
+      drag.tilt = (drag.tilt || 0) * .75 + clamp(vx * 14, -10, 10) * .25;
       const r = this.wrap.getBoundingClientRect();
       const px = ev.clientX - r.left, py = ev.clientY - r.top;
       drag.over = this.beyondArc(px, py);
       node.classList.toggle('over-table', drag.over);
-      this.showDropzone(true, this.arcProgress(px, py));
+      node.style.transform = `translate(${drag.ox + dx}px,${drag.oy + dy - 28}px) rotate(${drag.tilt.toFixed(1)}deg) rotateY(0deg) scale(${drag.over ? 1.1 : 1.06})`;
+      this.showDropzone(true, this.arcProgress(px, py), px, py);
       // cosa c'è sotto il dito?
       const under = (document.elementsFromPoint(ev.clientX, ev.clientY) || []).find(el => !node.contains(el)) || null;
       const chip = under && under.closest('.choice');
@@ -1023,6 +1041,8 @@ const Stage = {
       node.removeEventListener('pointermove', move); node.removeEventListener('pointerup', end); node.removeEventListener('pointercancel', cancel);
       try { node.releasePointerCapture(ev.pointerId); } catch (x) {}
       node.classList.remove('dragging', 'over-table'); node.style.zIndex = it.z || 2;
+      // atterraggio: molla morbida e ombra che si ritira
+      node.classList.add('landing'); clearTimeout(node._landT); node._landT = setTimeout(() => node.classList.remove('landing'), 700);
       this.drag = null;
       this.showDropzone(false);
       if (!drag.moved) { if (drag.deselect) this.clearSelection(); return; }   // tocco: resta selezionata (o torna in mano)
@@ -1631,8 +1651,8 @@ const ArcadeUI = {
       b.onclick = () => this.brief(st);
       map.appendChild(b);
     });
-    const target = map.querySelector('.node.next') || map.querySelectorAll('.node.done')[lastDoneIdx];
-    if (target) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
+    // la pagina parte sempre dall'alto (titolo), senza saltare alla tappa corrente
+    const scr = $('#scr-arcade'); if (scr) scr.scrollTop = 0;
   },
   brief(st) {
     const stars = this.prog.stars[st.id] || 0;

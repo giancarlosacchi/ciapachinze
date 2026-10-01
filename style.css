@@ -53,7 +53,7 @@ input { font: inherit; }
 .wordmark.small { font-size: 24px; }
 
 /* ---------- schermate ---------- */
-.screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; overflow: auto; }
+.screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; overflow-y: auto; overflow-x: hidden; }
 .screen.off { display: none; }
 .home { text-align: center; max-width: 720px; width: 100%; }
 .home .tag { font-family: var(--font-display); font-style: italic; font-weight: 400; color: #c9d4d2; font-size: clamp(16px, 2.2vw, 22px); margin: 10px 0 34px; }
@@ -136,8 +136,11 @@ input { font: inherit; }
 .card.denari .face { background: linear-gradient(160deg, #fffaf0, #f6e9c5); border-color: #d9b96a; box-shadow: inset 0 0 0 1px rgba(217,166,33,.45); }
 .card.selectable { cursor: grab; touch-action: none; }
 .card.dragging { transition: none !important; cursor: grabbing; }
-.card.dragging .face { box-shadow: 0 0 0 3px var(--oro-2), 0 24px 50px rgba(0,0,0,.6); }
-.card.over-table .face { box-shadow: 0 0 0 3px var(--basilico), 0 24px 50px rgba(0,0,0,.6); }
+.card .face { transition: box-shadow .18s ease; }
+.card.dragging .face { box-shadow: 0 0 0 3px var(--oro-2), 0 18px 28px rgba(0,0,0,.45), 0 40px 70px rgba(0,0,0,.4); }
+.card.over-table .face { box-shadow: 0 0 0 3px var(--basilico), 0 0 26px rgba(190,230,170,.7), 0 18px 28px rgba(0,0,0,.45), 0 40px 70px rgba(0,0,0,.4); }
+.card.landing { transition: transform .62s cubic-bezier(.22, 1.25, .36, 1), opacity .4s; }
+.card.landing .face { transition: box-shadow .5s cubic-bezier(.22, 1, .36, 1); }
 .card.selected { z-index: 6; }
 .card.selected .face { box-shadow: 0 0 0 3px var(--oro-2), 0 14px 30px rgba(0,0,0,.5); }
 .card.target .face { box-shadow: 0 0 0 3px var(--basilico), 0 0 24px rgba(127,163,108,.75); }
@@ -153,7 +156,7 @@ input { font: inherit; }
 /* mazzo */
 .deck { position: absolute; width: var(--card-w); height: var(--card-h); transform-origin: top left; }
 .deck .layer { position: absolute; inset: 0; border-radius: var(--radius); background: var(--rosso-2); border: 5px solid var(--carta); background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 6px, transparent 6px 12px), repeating-linear-gradient(-45deg, rgba(0,0,0,.12) 0 6px, transparent 6px 12px); box-shadow: 0 2px 4px rgba(0,0,0,.4); }
-.deck .count { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 900; font-size: 30px; font-family: var(--font-body); text-shadow: 0 2px 0 rgba(0,0,0,.45), 0 0 14px rgba(0,0,0,.5); z-index: 3; pointer-events: none; }
+.deck .count { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: calc(18px / var(--deck-k, 1)); font-family: var(--font-display); letter-spacing: .02em; text-shadow: 0 2px 0 rgba(0,0,0,.45), 0 0 14px rgba(0,0,0,.5); z-index: 3; pointer-events: none; }
 .deck .count:empty { display: none; }
 .deck { z-index: 2; }
 .pile { position: absolute; width: var(--card-w); height: var(--card-h); border-radius: var(--radius); border: 1px dashed rgba(255,255,255,.15); display: grid; place-items: center; color: rgba(255,255,255,.3); font-size: 12px; text-align: center; padding: 6px; cursor: pointer; transition: border-color .2s; transform-origin: top left; z-index: 2; }
@@ -288,7 +291,7 @@ input { font: inherit; }
   .player .avatar { width: 26px; height: 26px; font-size: 12px; }
   .player .name { font-size: 12px; max-width: 80px; }
   .player .sub { font-size: 10px; }
-  .pile .cnt, .deck .count { font-size: 10px; }
+  .pile .cnt { font-size: 10px; }
   .fx { font-size: 32px; }
     .modal { padding: 16px; border-radius: 14px; }
   .modal h2 { font-size: 22px; }
@@ -316,15 +319,27 @@ input { font: inherit; }
 
 /* arco mano/campo, scritta curva, riquadro di scelta */
 .dropzone, .hintarc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
-.dropzone #drop-fill { fill: rgba(190,230,170,.05); transition: fill .1s linear; }
-.dropzone #drop-path { fill: none; stroke: rgba(190,230,170,.7); stroke-width: 3; stroke-dasharray: 10 9; stroke-linecap: round; }
-.dropzone #drop-solid { fill: none; stroke: #bfe6a8; stroke-width: 3; stroke-linecap: round; opacity: 0; transition: opacity .08s linear, stroke-width .08s linear; }
+/* zona di lancio durante il trascinamento */
+.dropzone #drop-fill { fill: rgba(190,230,170,.03); transition: fill .1s linear; }
+.dropzone #drop-spotfill { opacity: 0; transition: opacity .12s linear; mix-blend-mode: screen; }
+.dropzone #drop-band { fill: none; stroke: rgba(190,230,170,.22); stroke-width: 10; stroke-linecap: round; filter: blur(8px); opacity: .25; }
+.dropzone #drop-path { fill: none; stroke: rgba(216,240,200,.6); stroke-width: 1.5; stroke-dasharray: 2 9; stroke-linecap: round; }
+.dropzone #drop-solid { fill: none; stroke: #e4f7d6; stroke-width: 2; stroke-linecap: round; opacity: 0; transition: opacity .08s linear, stroke-width .08s linear; filter: drop-shadow(0 0 6px rgba(190,230,170,.9)); }
+.dropzone #drop-pulse { fill: none; stroke: #e4f7d6; stroke-width: 2; opacity: 0; }
+.dropzone #drop-pulse.go { animation: dz-pulse .55s cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes dz-pulse { 0% { r: 6; opacity: .9; stroke-width: 3; } 100% { r: 90; opacity: 0; stroke-width: .5; } }
+/* mezzaluna: filo sottile, alone morbido che respira, due comete che scorrono */
 .hintarc text { fill: var(--testo-2); font-family: var(--font-display); font-style: italic; font-size: 15px; letter-spacing: .04em; }
-.hintarc #hint-glow { fill: none; stroke: #bfe6a8; stroke-width: 3; stroke-linecap: round; opacity: 0; }
-.hintarc.myturn #hint-glow { animation: breathe 2.2s ease-in-out infinite; }
-.hintarc.myturn text { fill: #d8f0c8; }
-@keyframes breathe { 0%, 100% { opacity: .08; stroke-width: 2; } 50% { opacity: .75; stroke-width: 4; filter: drop-shadow(0 0 8px rgba(190,230,170,.8)); } }
-@media (prefers-reduced-motion: reduce) { .hintarc.myturn #hint-glow { animation: none; opacity: .5; } }
+.hintarc #hint-aurora { fill: none; stroke: rgba(190,230,170,.35); stroke-width: 14; stroke-linecap: round; filter: blur(10px); opacity: 0; }
+.hintarc #hint-glow { fill: none; stroke: rgba(216,240,200,.55); stroke-width: 1.25; stroke-linecap: round; opacity: 0; }
+.hintarc #hint-comet, .hintarc #hint-comet2 { fill: none; stroke: #eefbe4; stroke-width: 2; stroke-linecap: round; opacity: 0; filter: drop-shadow(0 0 5px rgba(216,240,200,.95)); }
+.hintarc.myturn #hint-aurora { animation: aurora 3.2s ease-in-out infinite; }
+.hintarc.myturn #hint-glow { opacity: 1; }
+.hintarc.myturn #hint-comet, .hintarc.myturn #hint-comet2 { opacity: 1; animation: comet 4.2s linear infinite; }
+.hintarc.myturn text { fill: #e4f2d8; }
+@keyframes aurora { 0%, 100% { opacity: .25; stroke-width: 10; } 50% { opacity: .7; stroke-width: 18; } }
+@keyframes comet { from { stroke-dashoffset: calc(var(--len) * 1px + 60px); } to { stroke-dashoffset: -60px; } }
+@media (prefers-reduced-motion: reduce) { .hintarc.myturn #hint-aurora, .hintarc.myturn #hint-comet, .hintarc.myturn #hint-comet2 { animation: none; opacity: .5; } }
 @media (max-width: 520px) { .hintarc text { font-size: 13px; } }
 
 .review-bar { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 46; display: flex; align-items: center; gap: 10px; background: rgba(12,20,26,.9); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 13px; color: var(--testo-2); max-width: 96%; }
@@ -488,7 +503,6 @@ html.theme-memphis .fx .ribbon::before, html.theme-memphis .fx .ribbon::after { 
 #game.landscape .iconbtn { width: 30px; height: 30px; font-size: 14px; }
 #game.landscape .player.label .name { max-width: 80px; font-size: 11px; }
 #game.landscape .player.label { padding: 2px 8px 2px 3px; }
-#game.landscape .deck .count { font-size: 34px; }
 @media (max-height: 520px) and (orientation: landscape) {
   :root { --card-w: 52px; --card-h: 76px; --radius: 6px; }
   .hintarc text { font-size: 12px; }
@@ -605,8 +619,11 @@ html.theme-memphis #game .goalbar.open .goalbtn { background: #ffd23f; }
 html.theme-memphis #game .goalbar .goalpop > div { border-top-color: rgba(27,26,36,.15); }
 html.theme-memphis #game .goalbar .goalpop .town, html.theme-memphis #game .goalbar .goalpop small { color: #555; }
 html.theme-memphis #game .hintarc text { fill: #1b1a24; font-weight: 600; }
-html.theme-memphis #game .hintarc #hint-glow, #game .dropzone #drop-solid { stroke: #ffd23f; }
+html.theme-memphis #game .hintarc #hint-glow { stroke: rgba(27,26,36,.75); }
+html.theme-memphis #game .hintarc #hint-aurora, html.theme-memphis #game .dropzone #drop-band { stroke: rgba(255,210,63,.6); }
+html.theme-memphis #game .hintarc #hint-comet, html.theme-memphis #game .hintarc #hint-comet2, html.theme-memphis #game .dropzone #drop-solid, html.theme-memphis #game .dropzone #drop-pulse { stroke: #1b1a24; filter: none; }
 html.theme-memphis #game .dropzone #drop-path { stroke: rgba(27,26,36,.7); }
+html.theme-memphis #game .dropzone #drop-spotfill { mix-blend-mode: normal; }
 html.theme-memphis #game .dropzone #drop-fill { fill: rgba(255,210,63,.18) !important; }
 html.theme-memphis #game .bottombar { background: #fff; border-top: 3px solid #1b1a24; }
 html.theme-memphis #game .vbtn { background: #fff; color: #1b1a24; border: 2px solid #1b1a24; box-shadow: 3px 3px 0 #1b1a24; }
@@ -765,7 +782,8 @@ html:not(.theme-memphis) #scr-home .field:focus-within label { color: #fff; }
 #arcade-note { margin: 10px 0 0; font-size: 13px; }
 #arcade-note:empty { display: none; }
 .map { position: relative; margin: 0 auto 30px; }
-.path-map { display: block; margin: 0 auto; }
+.path-map { display: block; margin: 0 auto; max-width: 100%; }
+#scr-arcade > * { max-width: 100%; box-sizing: border-box; }
 .path-map .trail { fill: none; stroke: rgba(255,255,255,.16); stroke-width: 12; stroke-linecap: round; }
 .path-map .trail.done { stroke: var(--oro); stroke-width: 12; }
 .path-map .zone-lbl { font-family: var(--font-display); font-weight: 700; font-size: 14px; opacity: .85; letter-spacing: .02em; }

@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest?v=202610010907">
+<link rel="manifest" href="manifest.webmanifest?v=202610010913">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Ciapachinze">
@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..900,0..100,0..1;1,9..144,400..900,0..100,0..1&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..900;1,6..12,400..900&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem("cpz-theme")==="memphis")document.documentElement.classList.add("theme-memphis")}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=202610010907">
+<link rel="stylesheet" href="style.css?v=202610010913">
 </head>
 <body>
 
@@ -76,7 +76,7 @@
       <h2 class="arcade-title">Il giro della Liguria</h2>
       <p class="arcade-tag">Da Ventimiglia a La Spezia, un tavolo per ogni tappa.</p>
       <div class="arcade-summary" id="arcade-summary"></div>
-      <div class="seg arcade-mode" id="arcade-mode"><button data-v="solo" class="on">1 vs 1 · da solo</button><button data-v="coop">2 vs 2 · con un amico</button></div>
+      <div class="seg arcade-mode" id="arcade-mode"><button data-v="solo" class="on">1 vs 1</button><button data-v="coop">2 vs 2 con un amico</button></div>
       <p class="status" id="arcade-note"></p>
     </div>
     <div class="map" id="map"></div>
@@ -126,8 +126,8 @@
     <div class="stage" id="stage"></div>
     <div class="mstrip hidden" id="mstrip"><span id="ms-deck">40 nel mazzo</span></div>
     <div class="choices hidden" id="choices"></div>
-    <svg class="dropzone hidden" id="dropzone" aria-hidden="true"><path id="drop-fill"/><path id="drop-path"/><path id="drop-solid"/></svg>
-    <svg class="hintarc hidden" id="hintarc" aria-hidden="true"><defs><path id="hint-path"/></defs><path id="hint-glow"/><text><textPath href="#hint-path" startOffset="50%" text-anchor="middle" id="hint-text"></textPath></text></svg>
+    <svg class="dropzone hidden" id="dropzone" aria-hidden="true"><defs><radialGradient id="drop-spot" gradientUnits="userSpaceOnUse" r="150"><stop offset="0" stop-color="#d9f5c6" stop-opacity=".32"/><stop offset=".55" stop-color="#bfe6a8" stop-opacity=".08"/><stop offset="1" stop-color="#bfe6a8" stop-opacity="0"/></radialGradient></defs><path id="drop-fill"/><path id="drop-spotfill" fill="url(#drop-spot)"/><path id="drop-band"/><path id="drop-path"/><path id="drop-solid"/><circle id="drop-pulse" r="0"/></svg>
+    <svg class="hintarc hidden" id="hintarc" aria-hidden="true"><defs><path id="hint-path"/></defs><path id="hint-aurora"/><path id="hint-glow"/><path id="hint-comet"/><path id="hint-comet2"/><text><textPath href="#hint-path" startOffset="50%" text-anchor="middle" id="hint-text"></textPath></text></svg>
     <div class="chooser hidden" id="chooser"></div>
     <div class="review-bar hidden" id="review-bar"><span id="review-lbl"></span><button class="btn sm oro" id="review-close">Torna al riepilogo</button></div>
     <aside class="side" id="side">
@@ -152,8 +152,8 @@
 <div id="toasts"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';document.head.appendChild(s)"></script>
-<script src="engine.js?v=202610010907"></script>
-<script src="arcade.js?v=202610010907"></script>
-<script src="app.js?v=202610010907"></script>
+<script src="engine.js?v=202610010913"></script>
+<script src="arcade.js?v=202610010913"></script>
+<script src="app.js?v=202610010913"></script>
 </body>
 </html>

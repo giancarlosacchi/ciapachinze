@@ -1,5 +1,5 @@
 /* Ciapachinze — service worker: rete prima, copia locale come riserva (così l'app installata vede sempre l'ultima versione) */
-const CACHE = 'cpz-v202610010907';
+const CACHE = 'cpz-v202610010913';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', e => {
