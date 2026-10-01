@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011159';
+const APP_VERSION = '202610011207';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -440,7 +440,7 @@ const Client = {
    Rete PeerJS
    ===================================================================== */
 async function makePeer(id) {
-  const p = new Peer(id, { config: await iceConfig(), debug: 1 });
+  const p = new Peer(id, Object.assign({ config: await iceConfig(), debug: 1 }, window.__peerOpts || {}));
   return p;
 }
 const Session = {
@@ -462,23 +462,53 @@ async function hostRoom(cfg, name, solo, reuseCode) {
   $('#lobby-code').textContent = App.code;
   $('#lobby-status').textContent = 'Connessione al servizio…';
   showScreen('scr-lobby');
-  App.peer = await makePeer('cpz-' + App.code);
-  App.peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(App.peer); Session.save(); });
-  App.peer.on('connection', conn => Host.onConnection(conn));
-  App.peer.on('error', e => {
-    if (e.type === 'unavailable-id') { App.code = genCode(); $('#lobby-code').textContent = App.code; App.peer.destroy(); hostRoom(cfg, name); }
+  App.roster = Host.roster(); renderLobby();
+  history.replaceState(null, '', '#' + App.code);
+  await openHostPeer(cfg, name, !!reuseCode);
+}
+/* apre (o riapre, dopo che il telefono ha sospeso l'app) il peer del tavolo con lo stesso codice */
+async function openHostPeer(cfg, name, keep) {
+  if (typeof Peer === 'undefined') { $('#lobby-status').textContent = 'Libreria di rete non caricata: controlla la connessione e riapri l\'app.'; return; }
+  const peer = await makePeer('cpz-' + App.code);
+  App.peer = peer;
+  peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(peer); Session.save(); WakeLock.request(); });
+  peer.on('connection', conn => Host.onConnection(conn));
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id') {
+      // il codice risulta ancora occupato (di solito dalla nostra vecchia connessione, non ancora scaduta): riprova con lo stesso codice qualche volta, poi cambialo
+      App.idRetries = (App.idRetries || 0) + 1;
+      try { peer.destroy(); } catch (x) {}
+      if (keep && App.idRetries <= 4) { $('#lobby-status').textContent = 'Riapro il tavolo…'; setTimeout(() => openHostPeer(cfg, name, true), 2500); }
+      else { App.idRetries = 0; App.code = genCode(); $('#lobby-code').textContent = App.code; history.replaceState(null, '', '#' + App.code); openHostPeer(cfg, name, false); }
+    }
     else if (e.type === 'peer-unavailable') { /* ignora */ }
     else { $('#lobby-status').textContent = 'Errore di rete: ' + e.type; }
   });
-  App.peer.on('disconnected', () => { try { App.peer.reconnect(); } catch (e) {} });
-  App.roster = Host.roster(); renderLobby();
-  history.replaceState(null, '', '#' + App.code);
+  peer.on('disconnected', () => { setTimeout(() => { try { if (App.peer === peer && !peer.destroyed) peer.reconnect(); } catch (e) {} }, 500); });
 }
+/* sorveglianza della connessione: quando l'app torna in primo piano (o ogni pochi secondi) ricollega il peer se il telefono l'ha chiuso */
+function watchPeer() {
+  if (!App.peer || App.mode === 'solo' || !App.mode) return;
+  const p = App.peer;
+  try {
+    if (p.destroyed) { if (App.mode === 'host') { $('#lobby-status').textContent = 'Riapro il tavolo…'; openHostPeer(App.cfg, App.myName, true); } return; }
+    if (p.disconnected) { if (App.mode === 'host' && !Host.started) $('#lobby-status').textContent = 'Collegamento al servizio perso, ricollego…'; p.reconnect(); }
+  } catch (e) {}
+}
+setInterval(watchPeer, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { setTimeout(watchPeer, 300); WakeLock.request(); } });
+/* schermo acceso mentre il tavolo è aperto: se il telefono si blocca, la connessione con gli amici cade */
+const WakeLock = {
+  lock: null,
+  async request() { if (!('wakeLock' in navigator) || this.lock || !(App.mode === 'host' || App.mode === 'guest')) return; try { this.lock = await navigator.wakeLock.request('screen'); this.lock.addEventListener('release', () => { this.lock = null; }); } catch (e) {} },
+  release() { try { if (this.lock) this.lock.release(); } catch (e) {} this.lock = null; },
+};
 async function joinRoom(code, name) {
   App.mode = 'guest'; App.myName = name; App.code = code;
   const st = $('#join-status'); st.textContent = 'Mi collego al tavolo…';
   const btn = $('#btn-join'); if (btn) btn.disabled = true;
   const done = () => { if (btn) btn.disabled = false; };
+  if (typeof Peer === 'undefined') { st.textContent = 'Libreria di rete non caricata: controlla la connessione e riapri l\'app.'; done(); return; }
   App.peer = await makePeer(undefined);
   let opened = false, joined = false;
   // 1) il servizio di segnalazione deve rispondere
@@ -506,7 +536,7 @@ async function joinRoom(code, name) {
       if (tries++ < 2) { st.textContent = 'Il tavolo non risponde, riprovo…'; try { conn.close(); } catch (e) {} connectToHost(); }
       else { st.textContent = 'Non riesco a raggiungere il tavolo. Il tuo amico deve tenere il tavolo aperto sullo schermo; se siete su reti diverse provate entrambi con il Wi‑Fi, poi riprova.'; done(); }
     }, 12000);
-    conn.on('open', () => { joined = true; clearTimeout(t2); tries = 0; st.textContent = ''; done(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
+    conn.on('open', () => { joined = true; clearTimeout(t2); tries = 0; st.textContent = ''; done(); WakeLock.request(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
     conn.on('data', msg => Client.receive(msg));
     conn.on('close', () => { clearTimeout(t2); if (!joined) return; toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi: riapri il link del tavolo'); });
     conn.on('error', () => {});
@@ -1880,5 +1910,5 @@ const Updater = {
 setTimeout(() => Updater.check(false), 4000);
 // service worker: la pagina e i file si prendono sempre dalla rete quando c'è, dalla copia locale quando non c'è
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
-window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, iceConfig, busy: () => processing || queue.length > 0 };
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, iceConfig, hostRoom, joinRoom, busy: () => processing || queue.length > 0 };
 })();
