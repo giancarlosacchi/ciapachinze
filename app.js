@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010842';
+const APP_VERSION = '202610010847';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1576,35 +1576,53 @@ const ArcadeUI = {
     $('#stars-total').textContent = `★ ${list.reduce((a, st) => a + (p.stars[st.id] || 0), 0)} / ${list.length * 3}`;
     $('#arcade-note').textContent = this.mode === 'coop' ? 'A coppie: apri il tavolo, invita un amico con il codice e affrontate insieme due computer. Il progresso resta su questo telefono.' : '';
     const map = $('#map'); map.innerHTML = '';
-    let nextFound = false;
-    Arcade.ZONES.forEach((z, zi) => {
-      const zone = document.createElement('div'); zone.className = 'zone';
-      zone.innerHTML = `<h3><i style="background:${z.color}"></i>${esc(z.name)}</h3><div class="stages"></div>`;
-      const grid = zone.querySelector('.stages');
-      list.filter(st => st.zone === zi).forEach(st => {
-        const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlockedIn(p, list, st.id);
-        const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
-        const b = document.createElement('button'); b.className = 'tappa' + (stars ? ' done' : '') + (isNext ? ' next' : ''); b.disabled = !unlocked;
-        b.innerHTML = `<span class="n">Tappa ${list.indexOf(st) + 1} · ${st.players === 4 ? '2 vs 2' : '1 vs 1'}</span><span class="town">${esc(st.town)}</span><span class="who">${esc(st.who)}</span><span class="st">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></span>${unlocked ? '' : '<span class="lock">🔒</span>'}`;
-        b.onclick = () => this.brief(st);
-        grid.appendChild(b);
-      });
-      map.appendChild(zone);
+    // sentiero a serpentina: una tappa ogni 120px, alternando sinistra e destra
+    const W = Math.min(map.clientWidth || 360, 560), stepY = 118, padY = 70, n = list.length;
+    const H = padY * 2 + stepY * (n - 1);
+    const xs = i => W / 2 + (W * 0.3) * Math.sin(i * 1.1 + 0.6);
+    const pts = list.map((st, i) => ({ x: xs(i), y: H - padY - i * stepY }));
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const cy = (a.y + b.y) / 2; d += ` C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`; }
+    let nextFound = false, lastDoneIdx = -1;
+    list.forEach((st, i) => { if ((p.stars[st.id] || 0) >= 1) lastDoneIdx = i; });
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.classList.add('path-map');
+    // zone bands
+    let bands = '';
+    Arcade.ZONES.forEach((z, zi) => { const idx = list.map((st, i) => st.zone === zi ? i : -1).filter(i => i >= 0); if (!idx.length) return; const y1 = pts[idx[idx.length - 1]].y - stepY / 2, y2 = pts[idx[0]].y + stepY / 2; bands += `<rect x="0" y="${Math.max(0, y1)}" width="${W}" height="${Math.min(H, y2) - Math.max(0, y1)}" fill="${z.color}" opacity=".07"/><text x="${W - 12}" y="${Math.max(0, y1) + 20}" text-anchor="end" class="zone-lbl" fill="${z.color}">${esc(z.name)}</text>`; });
+    // path: done part bright, rest dashed
+    const donePath = lastDoneIdx >= 0 ? (() => { let dd = `M ${pts[0].x} ${pts[0].y}`; for (let i = 1; i <= Math.min(lastDoneIdx + 1, n - 1); i++) { const a = pts[i - 1], b = pts[i]; const cy = (a.y + b.y) / 2; dd += ` C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`; } return dd; })() : '';
+    svg.innerHTML = `${bands}<path d="${d}" class="trail"/>${donePath ? `<path d="${donePath}" class="trail done"/>` : ''}`;
+    map.appendChild(svg);
+    list.forEach((st, i) => {
+      const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlockedIn(p, list, st.id);
+      const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
+      const b = document.createElement('button'); b.className = 'node' + (stars ? ' done' : '') + (isNext ? ' next' : '') + (unlocked ? '' : ' locked') + (st.players === 4 ? ' four' : '');
+      b.style.left = pts[i].x + 'px'; b.style.top = pts[i].y + 'px'; b.disabled = !unlocked;
+      const side = pts[i].x < W / 2 ? 'r' : 'l';
+      b.innerHTML = `<span class="pin">${unlocked ? (i + 1) : '🔒'}</span><span class="lbl ${side}"><b>${esc(st.town)}</b><i>${'★'.repeat(stars)}<em>${'★'.repeat(3 - stars)}</em></i></span>`;
+      b.onclick = () => this.brief(st);
+      b.title = st.who;
+      map.appendChild(b);
     });
+    // scorri fino alla tappa da giocare
+    const target = map.querySelector('.node.next') || map.querySelector('.node.done:last-of-type');
+    if (target) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
   },
   brief(st) {
     const stars = this.prog.stars[st.id] || 0;
     const list = Arcade.stagesFor(this.mode);
     const m = modal(`<h2>${esc(st.town)}<small>Tappa ${list.indexOf(st) + 1} · contro ${esc(st.who)}</small></h2>
       <p>${esc(st.intro)}</p>
-      <div class="opt" style="cursor:default"><span style="font-size:22px">🎯</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
-      <div class="opt" style="cursor:default"><span style="font-size:22px">🌟</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
+      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
+      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★★</span><span><b>Seconda stella</b><br>${esc(Arcade.goalText(st.star2))}</span></div>
+      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★★★</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
       <p style="font-size:13px">Difficoltà del computer: ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]} · ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} finora</p>
       <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">${this.mode === 'coop' ? 'Apri il tavolo e invita' : 'Gioca'}</button></div>`);
     m.querySelector('#stage-go').onclick = () => { m.remove(); this.mode === 'coop' ? this.startCoop(st) : this.start(st); };
   },
   start(st) {
-    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now();
     const names = st.players === 4 ? [st.who.split(' ')[0].replace(/^(il|la|lo|i|le|l')$/i, st.who), 'Compagno', st.who] : [st.who];
     const botNames = st.players === 4 ? ['Avversario 1', 'Il tuo compagno', 'Avversario 2'] : [st.who];
     if (st.players === 4) { botNames[0] = st.who; botNames[2] = st.who + ' 2'; }
@@ -1614,7 +1632,7 @@ const ArcadeUI = {
     setTimeout(() => this.goalbar(), 50);
   },
   startCoop(st) {
-    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.marginBest = -99;
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now();
     App.seenEventId = 0; App.view = null; App.arcade = st;
     const name = Store.get('cpz-name') || 'Tu';
     hostRoom({ players: 4, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0, coop: true }, botLevel: st.level }, name, false);
@@ -1634,18 +1652,20 @@ const ArcadeUI = {
     const my = C.teamOf(view, App.mySeat), ot = 1 - my; const d = view.lastDeal;
     const mySeats = view.teams[my];
     const won = view.phase === 'gameEnd' && view.winner === my;
-    const ctx = { deal: d, my, ot, mySeats, scores: view.scores, won };
+    const ctx = { deal: d, my, ot, mySeats, scores: view.scores, won, elapsed: Math.round((Date.now() - this.t0) / 1000) };
     this.dealsPlayed++;
     if (Arcade.goalCheck(st.goal, ctx)) this.goalDone = true;
+    if (st.star2 && Arcade.goalCheck(st.star2, ctx)) this.star2Done = true;
     if (Arcade.goalCheck(st.bonus, ctx)) this.bonusDone = true;
     const margin = d.teams[my].total - d.teams[ot].total; if (margin > this.marginBest) this.marginBest = margin;
     const fresh = Arcade.recordDeal(this.prog, d, my, mySeats);
     this.toastAch(fresh);
     const finished = st.deals ? (this.goalDone || this.dealsPlayed >= st.deals) : (view.phase === 'gameEnd');
     if (!finished) { this.goalbar(); return false; }
-    // stelle: 1 obiettivo, 2 obiettivo con margine (o partita vinta con >5 di scarto), 3 anche il bonus
+    // stelle: 1 = obiettivo, +1 = seconda condizione, +1 = terza condizione (solo se l'obiettivo è fatto)
     let stars = 0;
-    if (this.goalDone) { stars = 1; if (this.marginBest >= 4 || (won && view.scores[my] - view.scores[ot] >= 6)) stars = 2; if (this.bonusDone) stars = 3; }
+    if (this.goalDone) { stars = 1 + (this.star2Done ? 1 : 0) + (this.bonusDone ? 1 : 0); }
+    this.starsDetail = { goal: this.goalDone, s2: this.star2Done, s3: this.bonusDone };
     const fresh2 = Arcade.recordStage(this.prog, st, stars);
     this.toastAch(fresh2);
     this.result = { stars, won: stars > 0 };
@@ -1662,7 +1682,11 @@ const ArcadeUI = {
     const st = this.stage, r = this.result; const nextSt = Arcade.STAGES.find(x => x.id === st.id + 1);
     const m = modal(`<h2>${r.won ? 'Tappa superata!' : 'Tappa fallita'}<small>${esc(st.town)} · ${esc(st.who)}</small></h2>
       <div class="stars-big">${'★'.repeat(r.stars)}<span class="off">${'★'.repeat(3 - r.stars)}</span></div>
-      <p style="text-align:center">${r.won ? (r.stars === 3 ? 'Perfetto: obiettivo e terza stella.' : r.stars === 2 ? 'Obiettivo centrato con margine.' : 'Obiettivo centrato.') : 'Obiettivo mancato: ' + esc(Arcade.goalText(st.goal)) + '.'}</p>
+      <div class="starlist">
+        <div class="${this.starsDetail.goal ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.goal))}</div>
+        <div class="${this.starsDetail.goal && this.starsDetail.s2 ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.star2))}</div>
+        <div class="${this.starsDetail.goal && this.starsDetail.s3 ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.bonus))}</div>
+      </div>
       <div class="actions"><button class="btn ghost" id="res-map">Mappa</button><button class="btn" id="res-retry">${r.won ? 'Rigioca' : 'Riprova'}</button>${r.won && nextSt ? `<button class="btn oro" id="res-next">Prossima: ${esc(nextSt.town)}</button>` : ''}</div>`, { closable: false });
     m.querySelector('.modal').classList.add(r.won ? 'won' : 'lost');
     if (r.won) Stage.sparks();

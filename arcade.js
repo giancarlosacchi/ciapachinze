@@ -141,6 +141,8 @@
     buona:        { text: 'Bussa una buona (in mano)', check: c => c.deal.buone.some(b => c.mySeats.includes(b.seat)) },
     handicap:     { text: n => `Vinci la partita partendo da ${n} punti sotto`, check: c => c.won },
     cappotto:     { text: 'Fai cappotto (tutti i denari)', check: c => c.deal.cappotto === c.my },
+    fast:         { text: s => `Finisci la tappa in meno di ${s} secondi`, check: (c, s) => c.elapsed != null && c.elapsed <= s },
+    lead:         { text: n => `Chiudi con almeno ${n} punti di vantaggio in classifica`, check: (c, n) => c.scores[c.my] - c.scores[c.ot] >= n },
   };
 
   /* ---------- tappe: il giro della Liguria ---------- */
@@ -271,7 +273,25 @@
     { id: 117, zone: 4, town: 'Portovenere', who: 'i poeti', level: 3, players: 4, deals: 3, goal: ['cappotto'], bonus: ['grande'], intro: 'Tutti i denari in una smazzata. Tre tentativi.' },
     { id: 118, zone: 4, town: 'La Spezia', who: 'gli Ammiragli', level: 3, players: 4, target: 71, handicap: 20, goal: ['handicap', 20], bonus: ['margin', 15], intro: 'L\'ultima tappa: 71 punti, loro partono da 20.' },
   ];
-  function stagesFor(mode) { return mode === 'coop' ? COOP_STAGES : STAGES; }
+  /* seconda stella: una condizione esplicita per ogni tappa, più dura con le zone */
+  function star2For(st, i) {
+    if (st.star2) return st.star2;
+    const z = st.zone, hard = z + 1;
+    const pool = [
+      ['margin', 2 + hard],
+      ['scope', Math.min(1 + Math.ceil(hard / 2), 4)],
+      ['noScopeAgainst'],
+      ['fast', Math.max(60, 150 - hard * 15) * (st.target ? 3 : 1)],
+      ['carte'],
+      ['settebello'],
+    ];
+    const pick = pool[i % pool.length];
+    // evita doppioni con obiettivo e terza stella
+    const same = g => g && g[0] === pick[0];
+    if (same(st.goal) || same(st.bonus)) return pool[(i + 1) % pool.length];
+    return pick;
+  }
+  function stagesFor(mode) { const list = mode === 'coop' ? COOP_STAGES : STAGES; list.forEach((st, i) => { if (!st.star2) st.star2 = star2For(st, i); }); return list; }
   function isUnlockedIn(p, list, id) { const i = list.findIndex(s => s.id === id); return i === 0 || (p.stars[list[i - 1].id] || 0) >= 1; }
   root.Arcade = { COOP_STAGES, stagesFor, isUnlockedIn, STAGES, ZONES, GOALS, ACHIEVEMENTS, BOT_NAMES, chooseMove, load, save, blank, isUnlocked, totalStars, recordDeal, recordStage, goalText, goalCheck, unlockAchievements };
 })(typeof self !== 'undefined' ? self : this);
