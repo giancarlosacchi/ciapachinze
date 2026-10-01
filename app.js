@@ -1500,7 +1500,7 @@ const ArcadeUI = {
       list.filter(st => st.zone === zi).forEach(st => {
         const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlockedIn(p, list, st.id);
         const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
-        const b = document.createElement('button'); b.className = 'stage' + (stars ? ' done' : '') + (isNext ? ' next' : ''); b.disabled = !unlocked;
+        const b = document.createElement('button'); b.className = 'tappa' + (stars ? ' done' : '') + (isNext ? ' next' : ''); b.disabled = !unlocked;
         b.innerHTML = `<span class="n">Tappa ${list.indexOf(st) + 1} · ${st.players === 4 ? '2 vs 2' : '1 vs 1'}</span><span class="town">${esc(st.town)}</span><span class="who">${esc(st.who)}</span><span class="st">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></span>${unlocked ? '' : '<span class="lock">🔒</span>'}`;
         b.onclick = () => this.brief(st);
         grid.appendChild(b);
