@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010926';
+const APP_VERSION = '202610010934';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -800,6 +800,7 @@ const Stage = {
     this.locked = queue.length > 0;
     if (this.reviewing && view.phase === 'play') this.reviewCaptured(false);
     this.draw(this.layout(view));
+    if (App.arcade && view.phase === 'play' && typeof ArcadeUI !== 'undefined') ArcadeUI.liveCheck(view);
     const mob = this.mobile;
     $('#deck').classList.toggle('hidden', !view.deckCount); $('#mstrip').classList.add('hidden');
     const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount || '';
@@ -1699,18 +1700,32 @@ const ArcadeUI = {
     const st = this.stage; if (!st) { g.classList.add('hidden'); return; }
     if (!st.star2) Arcade.stagesFor(st.coop || st.players === 4 && Arcade.COOP_STAGES.includes(st) ? 'coop' : 'solo');
     g.classList.remove('hidden');
-    const deals = st.deals ? `<span class="n">${this.dealsPlayed + 1}/${st.deals}</span>` : '';
-    g.innerHTML = `<button class="goalbtn" type="button" aria-label="Obiettivi della tappa">★${deals}</button>
+    const deals = st.deals && st.deals > 1 ? `<span class="n">${Math.min(this.dealsPlayed + 1, st.deals)}/${st.deals}</span>` : '';
+    const k = (this.goalDone ? 1 : 0) + (this.star2Done ? 1 : 0) + (this.bonusDone ? 1 : 0);
+    g.innerHTML = `<button class="goalbtn" type="button" aria-label="Obiettivi della tappa"><span class="s">${'★'.repeat(k)}<i>${'★'.repeat(3 - k)}</i></span>${deals}</button>
       <div class="goalpop">
         <b class="town">${esc(st.town)}</b>
-        <div class="${this.goalDone ? 'ok' : ''}"><span>★</span><span>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}</span></div>
-        <div class="${this.goalDone && this.star2Done ? 'ok' : ''}"><span>★★</span><span>${esc(Arcade.goalText(st.star2))}</span></div>
-        <div class="${this.goalDone && this.bonusDone ? 'ok' : ''}"><span>★★★</span><span>${esc(Arcade.goalText(st.bonus))}</span></div>
-        ${st.deals ? `<small>Smazzata ${this.dealsPlayed + 1} di ${st.deals}</small>` : `<small>Partita a ${st.target}</small>`}
+        <div class="${this.goalDone ? 'ok' : ''}"><span>★</span><span>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}</span><em>fatto</em></div>
+        <div class="${this.star2Done ? 'ok' : ''}"><span>★★</span><span>${esc(Arcade.goalText(st.star2))}</span><em>fatto</em></div>
+        <div class="${this.bonusDone ? 'ok' : ''}"><span>★★★</span><span>${esc(Arcade.goalText(st.bonus))}</span><em>fatto</em></div>
+        ${st.deals > 1 ? `<small>Smazzata ${Math.min(this.dealsPlayed + 1, st.deals)} di ${st.deals}</small>` : st.deals ? '' : `<small>Partita a ${st.target}</small>`}
       </div>`;
     const btn = g.querySelector('.goalbtn');
     btn.onclick = e => { e.stopPropagation(); g.classList.toggle('open'); Sound.play('tap'); };
     if (!g._bound) { g._bound = true; document.addEventListener('pointerdown', e => { if (!g.contains(e.target)) g.classList.remove('open'); }); }
+  },
+  /* durante la smazzata: le condizioni che, una volta vere, restano vere (scope, settebello, piccola, grande, buona) si spuntano subito */
+  LIVE: { scope: 1, settebello: 1, piccola: 1, grande: 1, buona: 1 },
+  liveCheck(view) {
+    const st = this.stage; if (!st || !view.captured) return;
+    let partial; try { partial = C.scoreDeal(view.captured, view.scope, view.cfg); } catch (e) { return; }
+    partial.buone = view.buone || [];
+    const my = C.teamOf(view, App.mySeat), ot = 1 - my;
+    const ctx = { deal: partial, my, ot, mySeats: view.teams[my], scores: view.scores, won: false, elapsed: null };
+    let changed = false;
+    const test = (g, flag) => { if (!g || this[flag] || !this.LIVE[g[0]]) return; if (Arcade.goalCheck(g, ctx)) { this[flag] = true; changed = true; } };
+    test(st.goal, 'goalDone'); test(st.star2, 'star2Done'); test(st.bonus, 'bonusDone');
+    if (changed) { this.goalbar(); const b = $('#goalbar .goalbtn'); if (b) { b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 900); } }
   },
   /* chiamato a fine smazzata (solo mode arcade) → ritorna true se la tappa è finita */
   onDealEnd(view) {
@@ -1728,6 +1743,7 @@ const ArcadeUI = {
     this.toastAch(fresh);
     const finished = st.deals ? (this.goalDone || this.dealsPlayed >= st.deals) : (view.phase === 'gameEnd');
     if (!finished) { this.goalbar(); return false; }
+    this.goalbar();
     // stelle: 1 = obiettivo, +1 = seconda condizione, +1 = terza condizione (solo se l'obiettivo è fatto)
     let stars = 0;
     if (this.goalDone) { stars = 1 + (this.star2Done ? 1 : 0) + (this.bonusDone ? 1 : 0); }
