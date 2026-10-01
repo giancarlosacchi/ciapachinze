@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011207';
+const APP_VERSION = '202610011217';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -212,22 +212,24 @@ const App = {
   view: null,           // ultima vista ricevuta
   seenEventId: 0,
 };
-/* server ICE: STUN di Google + TURN gratuito dell'Open Relay Project (autenticazione a segreto condiviso, credenziali calcolate qui con HMAC-SHA1 e valide 12 ore).
-   Senza un TURN raggiungibile due telefoni su reti mobili diverse spesso non riescono a parlarsi. */
+/* server ICE. STUN (gratuito) basta quando almeno una delle due reti è "aperta"; fra due telefoni su rete mobile serve quasi sempre un
+   TURN (server ponte). I TURN pubblici gratuiti di una volta (Open Relay) non esistono più: verificato — il DNS non risponde o il server
+   rifiuta. Per avere il ponte si configura un account gratuito (vedi README): o credenziali fisse (ExpressTURN) o la chiave API di Metered. */
 const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+const TURN_STATIC = null;      // es. { urls: ['turn:relay1.expressturn.com:3478', 'turn:relay1.expressturn.com:3478?transport=tcp'], username: '…', credential: '…' }
+const METERED = null;          // es. { app: 'ciapachinze', key: '…' }  → https://ciapachinze.metered.live/api/v1/turn/credentials?apiKey=…
 let iceCache = null;
 async function iceConfig() {
   if (iceCache && iceCache.until > Date.now()) return iceCache.cfg;
-  const servers = STUN.slice();
-  try {
-    const expiry = Math.floor(Date.now() / 1000) + 12 * 3600, username = String(expiry);
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('openrelayprojectsecret'), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
-    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(username));
-    const credential = btoa(String.fromCharCode(...new Uint8Array(sig)));
-    ['turn:staticauth.openrelay.metered.ca:80', 'turn:staticauth.openrelay.metered.ca:443', 'turn:staticauth.openrelay.metered.ca:443?transport=tcp', 'turns:staticauth.openrelay.metered.ca:443']
-      .forEach(urls => servers.push({ urls, username, credential }));
-  } catch (e) { /* senza crypto.subtle: solo STUN */ }
-  iceCache = { cfg: { iceServers: servers }, until: Date.now() + 6 * 3600e3 };
+  let servers = STUN.slice();
+  if (TURN_STATIC) servers.push(TURN_STATIC);
+  if (METERED) {
+    try {
+      const r = await fetch(`https://${METERED.app}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(METERED.key)}`, { cache: 'no-store' });
+      if (r.ok) { const list = await r.json(); if (Array.isArray(list) && list.length) servers = list.concat(STUN); }
+    } catch (e) { /* senza rete verso Metered: solo STUN */ }
+  }
+  iceCache = { cfg: { iceServers: servers }, until: Date.now() + 2 * 3600e3 };
   return iceCache.cfg;
 }
 const token = (() => { let t = Store.get('cpz-token'); if (!t) { t = Math.random().toString(36).slice(2) + Date.now().toString(36); Store.set('cpz-token', t); } return t; })();

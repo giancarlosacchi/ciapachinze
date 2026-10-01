@@ -34,3 +34,15 @@ Le regole implementate sono in [REGOLE.md](REGOLE.md) e nel pulsante **?** dentr
 - `test.js` — test del motore: `node test.js`.
 
 Il sito è statico e si pubblica su GitHub Pages così com'è. L'unica dipendenza esterna è PeerJS (caricata da CDN) per lo scambio dei dati e della voce tra i browser.
+
+## Server ponte (TURN) per giocare da reti diverse
+
+Il gioco è peer-to-peer. Quando le due reti non si parlano direttamente (tipico fra due telefoni su rete mobile) serve un server
+TURN. In `app.js` ci sono due posti dove configurarlo:
+
+- `TURN_STATIC`: credenziali fisse, es. da un account gratuito [ExpressTURN](https://www.expressturn.com/) (1000 GB/mese):
+  `{ urls: ['turn:relay1.expressturn.com:3478', 'turn:relay1.expressturn.com:3478?transport=tcp'], username: '…', credential: '…' }`
+- `METERED`: `{ app: 'nome-app', key: 'chiave-api' }` da un account gratuito [Metered](https://www.metered.ca/) (500 MB/mese):
+  l'app chiede le credenziali temporanee all'API di Metered a ogni apertura.
+
+Senza nessuno dei due si usa solo STUN: funziona quando almeno uno dei due è su una rete "aperta" (molti Wi‑Fi di casa).
