@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010822';
+const APP_VERSION = '202610010825';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1408,7 +1408,7 @@ function applyName() {
   if (n) { $('#hello-name').textContent = n; $('#host-name').value = n; $('#join-name').value = n; }
 }
 applyName();
-$('#btn-change-name').onclick = () => openSettings();
+
 const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || Store.get('cpz-name') || '').trim();
 const hashCode = (location.hash || '').replace('#', '').toUpperCase();
 if (hashCode && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }

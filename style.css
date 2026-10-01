@@ -49,7 +49,7 @@ input { font: inherit; }
 .wordmark .i.h::after { content: "♥"; }
 .wordmark .i.d::after { content: "♦"; top: -.02em; font-size: .4em; }
 .wordmark .badge { display: inline-grid; place-items: center; width: .82em; height: 1.05em; margin-left: .18em; border-radius: .09em; background: var(--carta); color: var(--rosso); font-size: .62em; font-weight: 900; box-shadow: 0 .06em .15em rgba(0,0,0,.35); transform: rotate(9deg) translateY(-.08em); letter-spacing: -.05em; border: .04em solid var(--avorio-2); }
-.wordmark.big { font-size: clamp(44px, 9vw, 120px); }
+.wordmark.big { font-size: clamp(54px, 11.5vw, 150px); margin-bottom: 26px; }
 .wordmark.small { font-size: 24px; }
 
 /* ---------- schermate ---------- */
@@ -387,7 +387,7 @@ input { font: inherit; }
 .btn.blue { background: #2f8fd6; color: #fff; box-shadow: 0 6px 18px rgba(47,143,214,.35); }
 .home-cards.three { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 900px) { .home-cards.three { grid-template-columns: 1fr; } }
-.hello { margin: -18px 0 22px; color: var(--testo-2); font-size: 15px; }
+.hello { display: none !important; }
 .hello b { color: var(--avorio); }
 .arcade-sub { color: rgba(255,255,255,.8); font-size: 14px; margin: 0 0 12px; line-height: 1.45; }
 .arcade-progress { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; font-size: 14px; color: var(--avorio); }
@@ -492,7 +492,7 @@ input { font: inherit; }
 
 /* ===== apertura della home: le carte entrano una alla volta ===== */
 #scr-home.intro .wordmark.big { animation: introLogo .9s var(--ease) both; }
-#scr-home.intro .tag, #scr-home.intro .hello { animation: introFade .7s ease both; animation-delay: .35s; }
+
 #scr-home.intro .home-cards .panel { animation: introCard .85s cubic-bezier(.2,.9,.25,1.15) both; transform-origin: 50% 110%; }
 #scr-home.intro .home-cards .panel:nth-child(1) { animation-delay: .45s; }
 #scr-home.intro .home-cards .panel:nth-child(2) { animation-delay: .62s; }
