@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010830';
+const APP_VERSION = '202610010834';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -144,7 +144,7 @@ const Settings = {
   get theme() { return Store.get('cpz-theme') || 'classico'; },
   set theme(v) { Store.set('cpz-theme', v); applyTheme(); },
 };
-function applyTheme() { document.documentElement.classList.toggle('theme-memphis', Settings.theme === 'memphis'); const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', Settings.theme === 'memphis' ? '#f6f1e4' : '#24383a'); }
+function applyTheme() { document.documentElement.classList.toggle('theme-memphis', Settings.theme === 'memphis'); const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', Settings.theme === 'memphis' ? '#f6f1e4' : '#141b2a'); }
 // colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
 function suitColor(s) {
   if (Settings.fourColor) return { H: '#1f5fbf', D: '#c8202f', C: '#1f8a3c', S: '#1b1a24' }[s];
@@ -1394,7 +1394,32 @@ const Voice = {
 /* =====================================================================
    Avvio, eventi UI
    ===================================================================== */
-function seg(id, cb) { const el = $(id); el.querySelectorAll('button').forEach(b => b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b.dataset.v); }); }
+function seg(id, cb) {
+  const el = $(id);
+  // pastiglia che scivola sotto l'opzione scelta
+  let thumb = el.querySelector('.thumb'); if (!thumb) { thumb = document.createElement('span'); thumb.className = 'thumb'; el.prepend(thumb); }
+  const place = (animate = true) => { const on = el.querySelector('button.on'); if (!on) return; if (!animate) thumb.style.transition = 'none'; thumb.style.left = on.offsetLeft + 'px'; thumb.style.width = on.offsetWidth + 'px'; if (!animate) requestAnimationFrame(() => { thumb.style.transition = ''; }); };
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); place(); cb(b.dataset.v); });
+  requestAnimationFrame(() => place(false)); window.addEventListener('resize', () => place(false));
+  setTimeout(() => place(false), 1500); setTimeout(() => place(false), 3000);
+}
+/* onda luminosa al tocco sui pulsanti della home */
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('#scr-home .btn'); if (!b || document.documentElement.classList.contains('theme-memphis')) return;
+  const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
+  const rp = document.createElement('span'); rp.className = 'ripple'; rp.style.cssText = `left:${e.clientX - r.left}px;top:${e.clientY - r.top}px;width:${d}px;height:${d}px`;
+  b.appendChild(rp); setTimeout(() => rp.remove(), 600);
+}, { passive: true });
+/* le schede si inclinano verso il dito (solo con il mouse o un tocco fermo) */
+(() => {
+  const cards = $$('#scr-home .home-cards .panel');
+  cards.forEach(card => {
+    const move = e => { if (document.documentElement.classList.contains('theme-memphis')) return; const r = card.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; card.classList.add('tilt'); card.style.transform = `perspective(900px) rotateX(${(-y * 5).toFixed(2)}deg) rotateY(${(x * 6).toFixed(2)}deg) translateY(-2px)`; };
+    const reset = () => { card.classList.remove('tilt'); card.style.transform = ''; };
+    card.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') move(e); });
+    card.addEventListener('pointerleave', reset); card.addEventListener('pointercancel', reset); card.addEventListener('pointerup', reset);
+  });
+})();
 seg('#seg-players', v => App.cfg.players = +v);
 seg('#seg-target', v => App.cfg.target = +v);
 const savedName = Store.get('cpz-name') || '';
