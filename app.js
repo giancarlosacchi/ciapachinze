@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010837';
+const APP_VERSION = '202610010840';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -144,7 +144,7 @@ const Settings = {
   get theme() { return Store.get('cpz-theme') || 'classico'; },
   set theme(v) { Store.set('cpz-theme', v); applyTheme(); },
 };
-function applyTheme() { document.documentElement.classList.toggle('theme-memphis', Settings.theme === 'memphis'); const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', Settings.theme === 'memphis' ? '#f6f1e4' : '#141b2a'); }
+function applyTheme() { document.documentElement.classList.toggle('theme-memphis', Settings.theme === 'memphis'); const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', Settings.theme === 'memphis' ? '#f6f1e4' : '#1c2230'); }
 // colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
 function suitColor(s) {
   if (Settings.fourColor) return { H: '#1f5fbf', D: '#c8202f', C: '#1f8a3c', S: '#1b1a24' }[s];
@@ -1432,8 +1432,10 @@ function seg(id, cb) {
   };
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   el.addEventListener('click', e => { if (el._suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
-  requestAnimationFrame(() => place(false)); window.addEventListener('resize', () => place(false));
-  setTimeout(() => place(false), 1500); setTimeout(() => place(false), 3000);
+  const ready = () => { place(false); el.classList.add('ready'); };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestAnimationFrame(ready)); else requestAnimationFrame(ready);
+  if (window.ResizeObserver) new ResizeObserver(() => place(false)).observe(el);
+  window.addEventListener('resize', () => place(false));
 }
 /* onda luminosa al tocco sui pulsanti della home */
 document.addEventListener('pointerdown', e => {
