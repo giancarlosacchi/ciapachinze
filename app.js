@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011713';
+const APP_VERSION = '202610011718';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -238,7 +238,7 @@ const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''
 function showScreen(id) {
   $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); if (s.id === id) s.scrollTop = 0; });
   $('#game').classList.toggle('hidden', id !== 'game'); $('#game').classList.remove('enter');
-  if (id !== 'game') setTimeout(() => { try { updateOrientation(); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch (e) {} }, 0);
+  if (id !== 'game') setTimeout(() => { try { updateOrientation(); } catch (e) {} }, 0);
   if (showScreen.first) { showScreen.first = false; return; }
   const el = id === 'game' ? $('#game') : $('#' + id); if (el) { void el.offsetWidth; el.classList.add('enter'); }
 }
@@ -1686,7 +1686,7 @@ applyName();
 
 const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || Store.get('cpz-name') || '').trim();
 const hashCode = (location.hash || '').replace('#', '').toUpperCase();
-if (hashCode && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+if (hashCode && window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
 if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; }
 // nessun campo prende il fuoco all'apertura o al ritorno nell'app: la tastiera compare solo quando tocchi un campo
 function blurAll() { try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch (e) {} }
@@ -1729,7 +1729,7 @@ function openSettings() {
     const so = screen.orientation || {};
     d.textContent = [
       'versione ' + APP_VERSION,
-      'modalità: ' + (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app installata' : 'browser') + (document.fullscreenElement ? ' (schermo intero)' : ''),
+      'modalità: ' + ((window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) || navigator.standalone ? 'app installata' : 'browser') + (document.fullscreenElement ? ' (schermo intero)' : ''),
       'finestra: ' + window.innerWidth + '×' + window.innerHeight + ' · schermo: ' + screen.width + '×' + screen.height,
       'orientamento: ' + (so.type || '?') + ' (' + (so.angle != null ? so.angle + '°' : '?') + ') · blocco: ' + (so.lock ? 'disponibile' : 'no'),
       'browser: ' + navigator.userAgent,
@@ -2004,7 +2004,7 @@ window.addEventListener('orientationchange', () => { setTimeout(afterRotate, 80)
 try { matchMedia('(orientation: portrait)').addEventListener('change', () => setTimeout(updateOrientation, 50)); } catch (e) {}
 /* "Gira in orizzontale": su Android funziona anche con la rotazione automatica spenta, ma serve un tocco (e, nel browser, lo schermo intero) */
 async function forceLandscape() {
-  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const standalone = (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) || navigator.standalone;
   try { if (!standalone && !document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); } catch (e) {}
   try { await screen.orientation.lock('landscape'); App.orientLocked = true; }
   catch (e) { toast('Il telefono non permette di ruotare da qui: attiva la rotazione automatica nelle impostazioni rapide e gira il telefono'); }
@@ -2012,7 +2012,6 @@ async function forceLandscape() {
 function releaseOrientation() {
   try { if (App.orientLocked && screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   App.orientLocked = false;
-  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
 }
 {
   const auto = $('#rotate-auto'), ov = $('#rotate');
@@ -2021,15 +2020,14 @@ function releaseOrientation() {
   // anche un tocco sul resto dell'avviso (non sui bottoni) prova a girare lo schermo
   ov.addEventListener('click', e => { if (!e.target.closest('button')) forceLandscape(); });
 }
-/* in orizzontale, nel browser (non nell'app installata, già a tutto schermo): al primo tocco sul tavolo si passa a schermo intero per avere più spazio */
+/* nel browser (l'app installata è già a tutto schermo): al primo tocco si passa a schermo intero, senza barra di stato, e ci si resta */
 function maybeFullscreen() {
-  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const standalone = (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) || window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone;
   if (standalone || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
-  if (!$('#game').classList.contains('landscape')) return;
   try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch (e) {}
 }
-$('#game').addEventListener('pointerup', maybeFullscreen, true);
-$('#game').addEventListener('touchend', maybeFullscreen, true);
+document.addEventListener('pointerup', maybeFullscreen, true);
+document.addEventListener('touchend', maybeFullscreen, true);
 /* "Continua in verticale": reagisce al tocco (anche se iOS, dopo la rotazione, non consegna il click) */
 {
   const skip = () => { App.rotateSkipped = true; releaseOrientation(); updateOrientation(); };
