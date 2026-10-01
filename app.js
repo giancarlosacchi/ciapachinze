@@ -1,6 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
+const APP_VERSION = '202610010738';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1423,7 +1424,9 @@ function openSettings() {
       <p style="font-size:13px;margin:6px 0">Tutto è salvato su questo telefono e resta anche dopo gli aggiornamenti dell'app. Per portarlo su un altro telefono copia il codice e incollalo lì.</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost" id="opt-export">Copia codice di salvataggio</button><button class="btn sm ghost" id="opt-import">Incolla un codice</button></div>
     </details>
+    <p style="font-size:12px;color:var(--testo-2);margin:6px 0 0">Versione ${APP_VERSION} · <button class="linkish" id="opt-update" style="font-size:12px">Controlla aggiornamenti</button></p>
     <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" id="opt-close">Salva e chiudi</button></div>`);
+  m.querySelector('#opt-update').onclick = () => Updater.check(true);
   const nameIn = m.querySelector('#opt-name');
   const saveName = () => { const v = nameIn.value.trim(); if (v) { Store.set('cpz-name', v); applyName(); } };
   nameIn.addEventListener('input', saveName);
@@ -1607,5 +1610,21 @@ $('#btn-achievements').onclick = () => {
 };
 ArcadeUI.homeProgress();
 Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); } Store.mirror(); });
+/* aggiornamenti: se online c'è una versione più nuova, ricarica (solo quando non si sta giocando) */
+const Updater = {
+  async check(manual) {
+    try {
+      const r = await fetch(location.pathname.replace(/[^/]*$/, '') + 'index.html?nocache=' + Date.now(), { cache: 'no-store' });
+      const txt = await r.text(); const m = txt.match(/app\.js\?v=(\d+)/); const latest = m ? m[1] : null;
+      if (latest && latest !== APP_VERSION) {
+        if (!App.view || App.view.phase !== 'play') { toast('Nuova versione: aggiorno…'); setTimeout(() => location.reload(), 900); }
+        else if (manual) toast('C\'è una nuova versione: la scarico a fine partita');
+        else this.pending = true;
+      } else if (manual) toast('Hai già l\'ultima versione');
+    } catch (e) { if (manual) toast('Non riesco a controllare adesso'); }
+  },
+};
+setTimeout(() => Updater.check(false), 1500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) Updater.check(false); });
 window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, busy: () => processing || queue.length > 0 };
 })();
