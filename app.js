@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010913';
+const APP_VERSION = '202610010915';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -83,10 +83,10 @@ const Sound = (() => {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain(); master.gain.value = .9;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
-    // riverbero a convoluzione con coda sintetica (1.6 s)
-    const len = Math.floor(ctx.sampleRate * 1.6), buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8) * .5; }
-    verb = ctx.createConvolver(); verb.buffer = buf; const vg = ctx.createGain(); vg.gain.value = .22;
+    // riverbero a convoluzione con coda corta (0.7 s): dà aria senza allungare i suoni
+    const len = Math.floor(ctx.sampleRate * .7), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2) * .5; }
+    verb = ctx.createConvolver(); verb.buffer = buf; const vg = ctx.createGain(); vg.gain.value = .14;
     master.connect(comp).connect(ctx.destination); master.connect(verb).connect(vg).connect(comp);
     return ctx;
   }
@@ -111,17 +111,24 @@ const Sound = (() => {
     env(g, t0, .003, dur * .4, .2, dur * .6, vol);
     src.connect(h).connect(f).connect(g).connect(master); src.start(t0);
   }
+  // scintilla: sinusoide che sale di un'ottava in pochi ms, poi si spegne (il "ping" della scopa)
+  function sparkle(f0, t0, vol = .16, dur = .32) {
+    const a_ = ac(), o = a_.createOscillator(), g = a_.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f0 * 2, t0 + .05);
+    env(g, t0, .003, dur * .5, .12, dur * .5, vol); o.connect(g).connect(master); o.start(t0); o.stop(t0 + dur + .05);
+  }
+  /* tutti brevi: con l'audio acceso non devono mai sovrapporsi in modo fastidioso */
   const SFX = {
-    card() { const t = now(); noise(t, .09, { bp: 2600, q: .6, vol: .07 }); noise(t + .02, .06, { bp: 900, q: 1, vol: .05 }); },              // carta posata sul panno
-    take() { const t = now(); noise(t, .07, { bp: 3000, q: .7, vol: .06 }); bell(880, t + .01, .06, .35); },                                   // presa
-    deal() { const t = now(); for (let i = 0; i < 6; i++) noise(t + i * .055, .05, { bp: 2400 + i * 120, q: .7, vol: .05 }); },                // distribuzione
-    turn() { const t = now(); bell(1318, t, .07, .5); },                                                                                          // tocca a te (La alto, sottile)
-    scopa() { const t = now(); [659, 880, 1108, 1318].forEach((f, i) => bell(f, t + i * .07, .14, 1.1)); noise(t, .12, { bp: 5000, q: .5, vol: .05 }); },  // arpeggio Mi maggiore
-    buona() { const t = now(); note(110, t, { a: .005, d: .18, s: .1, r: .25, type: 'sine', vol: .5, lp: 400 }); note(110, t + .26, { a: .005, d: .18, s: .1, r: .3, type: 'sine', vol: .5, lp: 400 }); noise(t, .04, { bp: 500, q: 1, vol: .25, hp: 80 }); noise(t + .26, .04, { bp: 500, q: 1, vol: .25, hp: 80 }); bell(1760, t + .55, .08, .8); }, // due colpi sul tavolo + campanella
-    win() { const t = now(); [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => bell(f, t + i * .11, .14, 1.4)); [523, 784].forEach(f => note(f / 2, t + .66, { a: .02, d: .6, s: .3, r: 1.2, type: 'triangle', vol: .12, lp: 1500 })); },
-    lose() { const t = now(); [392, 370, 349, 311].forEach((f, i) => note(f, t + i * .22, { a: .02, d: .25, s: .3, r: .5, type: 'triangle', vol: .12, lp: 1200 })); },
-    ptt() { const t = now(); bell(1976, t, .05, .25); },
-    tap() { const t = now(); noise(t, .03, { bp: 3500, q: 1, vol: .04 }); },
+    card() { const t = now(); noise(t, .05, { bp: 2600, q: .6, vol: .06 }); noise(t + .015, .035, { bp: 900, q: 1, vol: .045 }); },           // carta posata sul panno
+    take() { const t = now(); noise(t, .04, { bp: 3000, q: .7, vol: .05 }); bell(1046, t + .005, .045, .18); },                               // presa: fruscio + tocco di campanella
+    deal() { const t = now(); for (let i = 0; i < 4; i++) noise(t + i * .045, .035, { bp: 2400 + i * 150, q: .7, vol: .045 }); },             // distribuzione
+    turn() { const t = now(); bell(1318, t, .06, .28); },                                                                                        // tocca a te
+    scopa() { const t = now(); sparkle(1318, t, .14, .3); bell(2637, t + .06, .07, .3); noise(t, .025, { bp: 7000, q: .6, vol: .035, hp: 3000 }); }, // scopa: scintilla breve, diversa dalle carte
+    buona() { const t = now(); note(110, t, { a: .004, d: .1, s: .1, r: .14, type: 'sine', vol: .45, lp: 400 }); noise(t, .03, { bp: 500, q: 1, vol: .22, hp: 80 }); bell(1760, t + .14, .06, .3); }, // un colpo sul tavolo + campanella
+    win() { const t = now(); [659, 784, 1046, 1318].forEach((f, i) => bell(f, t + i * .07, .11, .5)); },
+    lose() { const t = now(); [392, 349, 311].forEach((f, i) => note(f, t + i * .14, { a: .01, d: .12, s: .3, r: .2, type: 'triangle', vol: .1, lp: 1200 })); },
+    ptt() { const t = now(); bell(1976, t, .045, .16); },
+    tap() { const t = now(); noise(t, .02, { bp: 3500, q: 1, vol: .035 }); },
   };
   const play = name => { if (!on || !SFX[name]) return; try { if (ac().state === 'suspended') ac().resume(); SFX[name](); } catch (e) {} };
   return { play, get on() { return on; }, set on(v) { on = v; Store.set('cpz-sound', v ? 'on' : 'off'); } };
