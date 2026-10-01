@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011154';
+const APP_VERSION = '202610011159';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -212,12 +212,24 @@ const App = {
   view: null,           // ultima vista ricevuta
   seenEventId: 0,
 };
-const ICE = { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-] };
+/* server ICE: STUN di Google + TURN gratuito dell'Open Relay Project (autenticazione a segreto condiviso, credenziali calcolate qui con HMAC-SHA1 e valide 12 ore).
+   Senza un TURN raggiungibile due telefoni su reti mobili diverse spesso non riescono a parlarsi. */
+const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+let iceCache = null;
+async function iceConfig() {
+  if (iceCache && iceCache.until > Date.now()) return iceCache.cfg;
+  const servers = STUN.slice();
+  try {
+    const expiry = Math.floor(Date.now() / 1000) + 12 * 3600, username = String(expiry);
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('openrelayprojectsecret'), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(username));
+    const credential = btoa(String.fromCharCode(...new Uint8Array(sig)));
+    ['turn:staticauth.openrelay.metered.ca:80', 'turn:staticauth.openrelay.metered.ca:443', 'turn:staticauth.openrelay.metered.ca:443?transport=tcp', 'turns:staticauth.openrelay.metered.ca:443']
+      .forEach(urls => servers.push({ urls, username, credential }));
+  } catch (e) { /* senza crypto.subtle: solo STUN */ }
+  iceCache = { cfg: { iceServers: servers }, until: Date.now() + 6 * 3600e3 };
+  return iceCache.cfg;
+}
 const token = (() => { let t = Store.get('cpz-token'); if (!t) { t = Math.random().toString(36).slice(2) + Date.now().toString(36); Store.set('cpz-token', t); } return t; })();
 const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 
@@ -427,8 +439,8 @@ const Client = {
 /* =====================================================================
    Rete PeerJS
    ===================================================================== */
-function makePeer(id) {
-  const p = new Peer(id, { config: ICE, debug: 1 });
+async function makePeer(id) {
+  const p = new Peer(id, { config: await iceConfig(), debug: 1 });
   return p;
 }
 const Session = {
@@ -450,7 +462,7 @@ async function hostRoom(cfg, name, solo, reuseCode) {
   $('#lobby-code').textContent = App.code;
   $('#lobby-status').textContent = 'Connessione al servizio…';
   showScreen('scr-lobby');
-  App.peer = makePeer('cpz-' + App.code);
+  App.peer = await makePeer('cpz-' + App.code);
   App.peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(App.peer); Session.save(); });
   App.peer.on('connection', conn => Host.onConnection(conn));
   App.peer.on('error', e => {
@@ -462,23 +474,41 @@ async function hostRoom(cfg, name, solo, reuseCode) {
   App.roster = Host.roster(); renderLobby();
   history.replaceState(null, '', '#' + App.code);
 }
-function joinRoom(code, name) {
+async function joinRoom(code, name) {
   App.mode = 'guest'; App.myName = name; App.code = code;
   const st = $('#join-status'); st.textContent = 'Mi collego al tavolo…';
-  App.peer = makePeer(undefined);
+  const btn = $('#btn-join'); if (btn) btn.disabled = true;
+  const done = () => { if (btn) btn.disabled = false; };
+  App.peer = await makePeer(undefined);
+  let opened = false, joined = false;
+  // 1) il servizio di segnalazione deve rispondere
+  const t1 = setTimeout(() => { if (!opened) { st.textContent = 'Il servizio di gioco non risponde: controlla la connessione e riprova.'; done(); } }, 10000);
   App.peer.on('open', () => {
+    opened = true; clearTimeout(t1);
+    st.textContent = 'Trovato il servizio, chiamo il tavolo…';
     Voice.attachPeer(App.peer);
     connectToHost();
   });
-  App.peer.on('error', e => { if (e.type === 'peer-unavailable') { st.textContent = 'Tavolo non trovato: controlla il codice.'; } else st.textContent = 'Errore: ' + e.type; });
+  App.peer.on('error', e => {
+    if (e.type === 'peer-unavailable') st.textContent = 'Tavolo non trovato: controlla il codice e che il tuo amico abbia ancora il tavolo aperto.';
+    else if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed') st.textContent = 'Problema di rete con il servizio di gioco: riprova tra qualche secondo.';
+    else st.textContent = 'Errore: ' + e.type;
+    done();
+  });
   App.peer.on('disconnected', () => { try { App.peer.reconnect(); } catch (e) {} });
   let tries = 0;
   function connectToHost() {
     const conn = App.peer.connect('cpz-' + code, { reliable: true, metadata: { name } });
     App.hostConn = conn;
-    conn.on('open', () => { tries = 0; st.textContent = ''; conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
+    // 2) il canale diretto con il tavolo deve aprirsi (qui entra in gioco il TURN se le reti sono chiuse)
+    const t2 = setTimeout(() => {
+      if (joined || conn.open) return;
+      if (tries++ < 2) { st.textContent = 'Il tavolo non risponde, riprovo…'; try { conn.close(); } catch (e) {} connectToHost(); }
+      else { st.textContent = 'Non riesco a raggiungere il tavolo. Il tuo amico deve tenere il tavolo aperto sullo schermo; se siete su reti diverse provate entrambi con il Wi‑Fi, poi riprova.'; done(); }
+    }, 12000);
+    conn.on('open', () => { joined = true; clearTimeout(t2); tries = 0; st.textContent = ''; done(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
     conn.on('data', msg => Client.receive(msg));
-    conn.on('close', () => { toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi: riapri il link del tavolo'); });
+    conn.on('close', () => { clearTimeout(t2); if (!joined) return; toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi: riapri il link del tavolo'); });
     conn.on('error', () => {});
   }
 }
@@ -1850,5 +1880,5 @@ const Updater = {
 setTimeout(() => Updater.check(false), 4000);
 // service worker: la pagina e i file si prendono sempre dalla rete quando c'è, dalla copia locale quando non c'è
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
-window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, busy: () => processing || queue.length > 0 };
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, iceConfig, busy: () => processing || queue.length > 0 };
 })();
