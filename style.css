@@ -338,7 +338,7 @@ input { font: inherit; }
 .hintarc.myturn #hint-comet, .hintarc.myturn #hint-comet2 { opacity: 1; animation: comet 4.2s linear infinite; }
 .hintarc.myturn text { fill: #e4f2d8; }
 @keyframes aurora { 0%, 100% { opacity: .25; stroke-width: 10; } 50% { opacity: .7; stroke-width: 18; } }
-@keyframes comet { from { stroke-dashoffset: calc(var(--len) * 1px + 60px); } to { stroke-dashoffset: -60px; } }
+@keyframes comet { from { stroke-dashoffset: 0; } to { stroke-dashoffset: calc(-1 * var(--period, 1000px)); } }
 @media (prefers-reduced-motion: reduce) { .hintarc.myturn #hint-aurora, .hintarc.myturn #hint-comet, .hintarc.myturn #hint-comet2 { animation: none; opacity: .5; } }
 @media (max-width: 520px) { .hintarc text { font-size: 13px; } }
 

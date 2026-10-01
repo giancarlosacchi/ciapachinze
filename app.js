@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010917';
+const APP_VERSION = '202610010921';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -861,7 +861,8 @@ const Stage = {
     ['#hint-path', '#hint-glow', '#hint-aurora', '#hint-comet', '#hint-comet2'].forEach(id => $(id).setAttribute('d', a.d));
     // le due "comete" che scorrono lungo l'arco: una scia corta su un tratteggio lungo quanto l'arco
     const len = a.R * (Math.PI * (this.mobile ? .93 : .87) - Math.PI * (this.mobile ? .07 : .13));
-    [$('#hint-comet'), $('#hint-comet2')].forEach((c, i) => { c.style.strokeDasharray = `${Math.round(len * .14)} ${Math.round(len)}`; c.style.setProperty('--len', len.toFixed(0)); c.style.animationDelay = i ? '-2.1s' : '0s'; });
+    const dash = Math.round(len * .14), gap = Math.round(len * 1.1);
+    [$('#hint-comet'), $('#hint-comet2')].forEach((c, i) => { c.style.strokeDasharray = `${dash} ${gap}`; c.style.setProperty('--period', (dash + gap) + 'px'); c.style.animationDelay = i ? '-2.1s' : '0s'; });
     $('#hint-text').textContent = text;
     svg.classList.remove('hidden');
   },
