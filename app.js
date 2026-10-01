@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010813';
+const APP_VERSION = '202610010820';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -31,7 +31,7 @@ const initials = n => (n || '?').replace(/\(.*?\)/g, '').trim().split(/\s+/).fil
    Salvataggio robusto: localStorage + copia in IndexedDB (sopravvive meglio su iPhone/Android)
    ===================================================================== */
 const Store = {
-  keys: ['cpz-name', 'cpz-arcade', 'cpz-record', 'cpz-4col', 'cpz-sound', 'cpz-token'],
+  keys: ['cpz-name', 'cpz-arcade', 'cpz-record', 'cpz-4col', 'cpz-sound', 'cpz-token', 'cpz-theme'],
   get(k) { try { return localStorage.getItem(k); } catch (e) { return this.mem[k] ?? null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} this.mem[k] = v; this.mirror(); },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} delete this.mem[k]; this.deleted.add(k); this.mirror(); },
@@ -70,6 +70,7 @@ const Store = {
   importAll(code) { try { const o = JSON.parse(decodeURIComponent(escape(atob(code.trim())))); Object.keys(o).forEach(k => { if (this.keys.includes(k)) this.set(k, o[k]); }); return true; } catch (e) { return false; } },
 };
 window.Store = Store;
+
 
 /* =====================================================================
    Suoni (sintetizzati, nessun file)
@@ -140,7 +141,10 @@ const Record = {
 const Settings = {
   get fourColor() { return Store.get('cpz-4col') === 'on'; },
   set fourColor(v) { Store.set('cpz-4col', v ? 'on' : 'off'); },
+  get theme() { return Store.get('cpz-theme') || 'classico'; },
+  set theme(v) { Store.set('cpz-theme', v); applyTheme(); },
 };
+function applyTheme() { document.documentElement.classList.toggle('theme-memphis', Settings.theme === 'memphis'); const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', Settings.theme === 'memphis' ? '#f6f1e4' : '#24383a'); }
 // colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
 function suitColor(s) {
   if (Settings.fourColor) return { H: '#1f5fbf', D: '#c8202f', C: '#1f8a3c', S: '#1b1a24' }[s];
@@ -594,7 +598,7 @@ const Stage = {
   },
   deckPos() {
     const cw = this.cw(), ch = this.ch(); const n = App.view ? App.view.cfg.players : 2;
-    if (this.mobile) return { x: 12, y: -ch / 2 };
+    if (this.mobile) return { x: 10, y: 10, scale: .55 };
     if (this.landscape) return { x: 12, y: 10, scale: .62 };
     return n === 4 ? { x: 26, y: 80 } : { x: 34, y: this.H / 2 - ch / 2 };
   },
@@ -767,10 +771,9 @@ const Stage = {
     if (this.reviewing && view.phase === 'play') this.reviewCaptured(false);
     this.draw(this.layout(view));
     const mob = this.mobile;
-    $('#deck').classList.toggle('hidden', mob); $('#mstrip').classList.toggle('hidden', !mob);
-    if (mob) { $('#ms-deck').textContent = `${view.deckCount} nel mazzo`; $('#mstrip').classList.toggle('low', view.cfg.players === 4); }
-    const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount ? (this.landscape ? `${view.deckCount}` : `${view.deckCount} carte nel mazzo`) : (this.landscape ? '' : 'mazzo finito');
-    deck.style.opacity = view.deckCount ? 1 : .25;
+    $('#deck').classList.toggle('hidden', !view.deckCount); $('#mstrip').classList.add('hidden');
+    const deck = $('#deck'); deck.querySelector('.count').textContent = view.deckCount || '';
+    deck.style.opacity = 1;
     const my = C.teamOf(view, App.mySeat);
     for (let t = 0; t < 2; t++) {
       const p = $('#pile' + t), pp = this.pilePos(t, view);
@@ -1433,6 +1436,7 @@ $('#btn-rules').onclick = () => openSettings();
 function openSettings() {
   const m = modal(`<h2>Impostazioni</h2>
     <div class="field"><label for="opt-name">Il tuo nome</label><input id="opt-name" maxlength="16" placeholder="es. Mario Rossi" value="${esc(Store.get('cpz-name') || '')}"></div>
+    <div class="field"><label>Tema</label><div class="seg" id="opt-theme"><button data-v="classico" class="${Settings.theme === 'classico' ? 'on' : ''}">Classico · panno verde</button><button data-v="memphis" class="${Settings.theme === 'memphis' ? 'on' : ''}">Memphis · colori pop</button></div></div>
     <label class="opt"><input type="checkbox" id="opt-4col" ${Settings.fourColor ? 'checked' : ''}> <span><b>Carte a quattro colori</b><br><small>♦ rosso, ♥ blu, ♣ verde, ♠ nero: i semi si riconoscono al volo</small></span></label>
     <label class="opt"><input type="checkbox" id="opt-sound" ${Sound.on ? 'checked' : ''}> <span><b>Suoni</b></span></label>
     <details class="backup"><summary>Salvataggi (nome, arcade, storico)</summary>
@@ -1442,6 +1446,7 @@ function openSettings() {
     <p style="font-size:12px;color:var(--testo-2);margin:6px 0 0">Versione ${APP_VERSION} · <button class="linkish" id="opt-update" style="font-size:12px">Controlla aggiornamenti</button></p>
     <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" id="opt-close">Salva e chiudi</button></div>`);
   m.querySelector('#opt-update').onclick = () => Updater.check(true);
+  m.querySelectorAll('#opt-theme button').forEach(b => b.onclick = () => { Settings.theme = b.dataset.v; m.querySelectorAll('#opt-theme button').forEach(x => x.classList.toggle('on', x === b)); });
   const nameIn = m.querySelector('#opt-name');
   const saveName = () => { const v = nameIn.value.trim(); if (v) { Store.set('cpz-name', v); applyName(); } };
   nameIn.addEventListener('input', saveName);
@@ -1624,7 +1629,8 @@ $('#btn-achievements').onclick = () => {
   modal(`<h2>Traguardi<small>${p.unlocked.length} su ${Arcade.ACHIEVEMENTS.length}</small></h2><div class="ach-grid">${Arcade.ACHIEVEMENTS.map(a => `<div class="ach ${p.unlocked.includes(a.id) ? '' : 'locked'}"><div class="ic">${a.icon}</div><div class="nm">${esc(a.name)}</div><div class="ds">${esc(a.desc)}</div></div>`).join('')}</div><div class="actions"><button class="btn" onclick="this.closest('.modal-bg').remove()">Chiudi</button></div>`);
 };
 ArcadeUI.homeProgress();
-Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); } Store.mirror(); });
+applyTheme();
+Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); applyTheme(); } Store.mirror(); });
 /* 2 vs 2 sul telefono: si gioca in orizzontale */
 function updateOrientation() {
   const four = (App.view && App.view.cfg.players === 4) || (!App.view && App.cfg && App.cfg.players === 4 && (App.mode === 'host' || App.mode === 'guest' || App.mode === 'solo'));
