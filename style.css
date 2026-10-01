@@ -192,15 +192,10 @@ input { font: inherit; }
 .hint { position: absolute; left: 50%; transform: translateX(-50%); color: var(--testo-2); font-size: 13px; pointer-events: none; text-align: center; z-index: 4; }
 
 /* effetti */
-.fx { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 900; font-size: 64px; color: #fff; text-shadow: 0 3px 0 var(--rosso), 0 8px 24px rgba(0,0,0,.8); pointer-events: none; z-index: 20; animation: fxpop 1.6s var(--ease) forwards; letter-spacing: -.02em; white-space: nowrap; padding: 18px 34px; border-radius: 22px; background: rgba(8,16,14,.82); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 20px 60px rgba(0,0,0,.6); text-align: center; }
-.fx::before { content: ""; position: absolute; inset: -40px; z-index: -1; border-radius: 40px; background: radial-gradient(ellipse at center, rgba(8,16,14,.75), rgba(8,16,14,0) 70%); }
-.fx small { display: block; font-size: 20px; font-weight: 400; font-style: italic; text-shadow: none; color: var(--oro-2); text-align: center; margin-top: 4px; }
-.fx.oro { text-shadow: 0 3px 0 var(--oro), 0 8px 24px rgba(0,0,0,.8); border-color: rgba(240,199,80,.5); }
-@keyframes fxpop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.5) rotate(-6deg); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(2deg); } 30% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1.05); } }
 .shake { animation: shake .5s; }
 @keyframes shake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-3px, 1px); } 80% { transform: translate(3px, -1px); } }
-.spark { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 19; animation: spark 1s ease-out forwards; }
-@keyframes spark { to { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; } }
+.spark { position: absolute; width: 9px; height: 9px; border-radius: 50%; pointer-events: none; z-index: 21; animation: spark 1.3s cubic-bezier(.2,.8,.3,1) forwards; box-shadow: 0 0 8px currentColor; }
+@keyframes spark { 0% { transform: translate(0,0) scale(.4); opacity: 1; } 60% { opacity: 1; } 100% { transform: translate(var(--dx), calc(var(--dy) + 60px)) scale(0); opacity: 0; } }
 
 /* pannello laterale */
 .side { position: absolute; top: 0; right: 0; bottom: 0; width: 320px; background: rgba(12,20,26,.92); backdrop-filter: blur(10px); border-left: 1px solid rgba(255,255,255,.08); transform: translateX(100%); transition: transform .35s var(--ease); z-index: 30; display: flex; flex-direction: column; }
@@ -280,7 +275,7 @@ input { font: inherit; }
   .scores { gap: 4px; }
   .iconbtn { width: 32px; height: 32px; font-size: 15px; border-radius: 8px; }
 
-  .fx { font-size: 40px; white-space: normal; max-width: 92%; text-align: center; padding: 14px 22px; }
+  .fx { --fs: 46px; }
 }
 @media (max-width: 520px) {
   :root { --card-w: 64px; --card-h: 93px; }
@@ -294,8 +289,7 @@ input { font: inherit; }
   .player .sub { font-size: 10px; }
   .pile .cnt, .deck .count { font-size: 10px; }
   .fx { font-size: 32px; }
-  .fx small { font-size: 14px; }
-  .modal { padding: 16px; border-radius: 14px; }
+    .modal { padding: 16px; border-radius: 14px; }
   .modal h2 { font-size: 22px; }
   .home .tag { margin-bottom: 20px; }
   .vbtn .lbl { display: none; }
@@ -445,3 +439,19 @@ input { font: inherit; }
 
 .stage-wrap.fxon .stage { filter: blur(2px) brightness(.55); transition: filter .25s; }
 .stage-wrap .stage { transition: filter .35s; }
+
+/* ===== annunci: Scopa! / bussata / buona del mazziere ===== */
+.fx { --fs: 76px; --c1: #c8202f; --c2: #ff6b7a; position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); pointer-events: none; z-index: 20; text-align: center; padding: 26px 46px; border-radius: 28px; background: rgba(6,14,12,.9); border: 2px solid var(--c2); box-shadow: 0 0 0 6px rgba(0,0,0,.25), 0 0 70px var(--c1), 0 30px 80px rgba(0,0,0,.7); max-width: 92%; animation: fxin 1.9s var(--ease) forwards; }
+.fx .t { display: block; font-family: var(--font-display); font-weight: 900; font-size: var(--fs); line-height: 1; letter-spacing: -.02em; color: #fff; text-shadow: 0 4px 0 var(--c1), 0 10px 30px rgba(0,0,0,.8); animation: fxtext 1.9s var(--ease) forwards; }
+.fx small { display: block; margin-top: 10px; font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 20px; color: var(--oro-2); opacity: 0; animation: fxsub 1.9s ease forwards; }
+.fx::before { content: ""; position: absolute; inset: -3px; border-radius: 30px; border: 2px solid var(--c2); opacity: 0; animation: fxring 1.9s ease-out forwards; }
+.fx::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.9), rgba(255,255,255,0) 70%); transform: translate(-50%, -50%); opacity: 0; animation: fxflash 1.9s ease-out forwards; }
+.fx.oro { --c1: #d9a621; --c2: #ffe39a; }
+.fx.oro .t { text-shadow: 0 4px 0 #9a7212, 0 10px 30px rgba(0,0,0,.8); }
+@keyframes fxin { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); } 22% { transform: translate(-50%, -50%) scale(.97); } 30% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -62%) scale(1.08); } }
+@keyframes fxtext { 0% { transform: translateY(30px) rotate(-6deg); letter-spacing: .2em; opacity: 0; } 14% { transform: translateY(0) rotate(2deg); letter-spacing: -.02em; opacity: 1; } 24% { transform: rotate(0); } 100% { transform: rotate(0); } }
+@keyframes fxsub { 0%, 22% { opacity: 0; transform: translateY(10px); } 36% { opacity: 1; transform: none; } 100% { opacity: 1; } }
+@keyframes fxring { 0% { opacity: 0; transform: scale(1); } 14% { opacity: .9; } 60% { opacity: 0; transform: scale(1.35); } 100% { opacity: 0; } }
+@keyframes fxflash { 0% { opacity: 0; width: 10px; height: 10px; } 10% { opacity: .9; } 40% { opacity: 0; width: 600px; height: 600px; } 100% { opacity: 0; } }
+.stage-wrap.fxon .stage { filter: blur(3px) brightness(.45) saturate(.7); }
+@media (prefers-reduced-motion: reduce) { .fx, .fx .t, .fx small, .fx::before, .fx::after { animation-duration: .01s; } }

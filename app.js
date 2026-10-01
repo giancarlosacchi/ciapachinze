@@ -1037,7 +1037,7 @@ const Stage = {
         const who = ev.seat === App.mySeat ? 'Hai bussato!' : `${finalView.names[ev.seat]} bussa!`;
         this.fx(who, `${ev.label} · +${ev.points}`, 'oro');
         if (sim) { sim.faceUp[ev.seat] = true; sim.hands[ev.seat] = ev.cards.slice(); const t = C.teamOf(finalView, ev.seat); sim.scope[t] += ev.points; this.draw(this.layout(sim)); }
-        await sleep(1500);
+        await sleep(1700);
         break;
       }
       case 'play': {
@@ -1060,7 +1060,7 @@ const Stage = {
           ev.captured.concat(played).forEach(id => this.nodes.get(id)?.classList.add('target'));
           if (ev.scopa) { this.fx('Scopa!', ev.kind === 'ace' ? `asso piglia tutto · ${finalView.names[ev.seat]}` : finalView.names[ev.seat]); Sound.play('scopa'); this.sparks(); }
           else Sound.play('take');
-          await sleep(ev.scopa ? 700 : 380);
+          await sleep(ev.scopa ? 900 : 380);
           const t = C.teamOf(finalView, ev.seat);
           sim.table = sim.table.filter(x => !ev.captured.includes(x.id) && x.id !== played);
           sim.captured[t].push(...ev.captured, played);
@@ -1085,18 +1085,20 @@ const Stage = {
     }
   },
   fx(text, sub, cls = '') {
-    const d = document.createElement('div'); d.className = 'fx ' + cls; d.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : '');
+    $$('.fx').forEach(x => x.remove());
+    const d = document.createElement('div'); d.className = 'fx ' + cls; d.innerHTML = `<span class="t">${esc(text)}</span>` + (sub ? `<small>${esc(sub)}</small>` : '');
     this.wrap.appendChild(d);
     // il campo dietro si abbassa e si sfoca per un attimo: la scritta resta leggibile
     this.wrap.classList.add('fxon'); clearTimeout(this.fxTimer);
-    this.fxTimer = setTimeout(() => this.wrap.classList.remove('fxon'), 1150);
-    setTimeout(() => d.remove(), 1600);
+    this.fxTimer = setTimeout(() => this.wrap.classList.remove('fxon'), 1500);
+    if (cls === 'oro') this.sparks(['#ffe39a', '#d9a621', '#fff']); 
+    setTimeout(() => d.remove(), 1950);
   },
-  sparks() {
-    const colors = ['#d9a621', '#f0c750', '#c8202f', '#f6f0e1', '#7fa36c'];
-    for (let i = 0; i < 26; i++) {
+  sparks(palette) {
+    const colors = palette || ['#d9a621', '#f0c750', '#c8202f', '#f6f0e1', '#7fa36c'];
+    for (let i = 0; i < 34; i++) {
       const s = document.createElement('div'); s.className = 'spark';
-      const a = Math.random() * Math.PI * 2, r = 80 + Math.random() * 160;
+      const a = Math.random() * Math.PI * 2, r = 110 + Math.random() * 220;
       s.style.left = this.W / 2 + 'px'; s.style.top = this.H * .45 + 'px'; s.style.background = colors[i % colors.length];
       s.style.setProperty('--dx', Math.cos(a) * r + 'px'); s.style.setProperty('--dy', Math.sin(a) * r + 'px');
       this.wrap.appendChild(s); setTimeout(() => s.remove(), 1100);
