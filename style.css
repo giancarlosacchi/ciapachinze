@@ -324,16 +324,6 @@ input { font: inherit; }
 .hintarc.myturn text { fill: #d8f0c8; }
 @keyframes breathe { 0%, 100% { opacity: .08; stroke-width: 2; } 50% { opacity: .75; stroke-width: 4; filter: drop-shadow(0 0 8px rgba(190,230,170,.8)); } }
 @media (prefers-reduced-motion: reduce) { .hintarc.myturn #hint-glow { animation: none; opacity: .5; } }
-.chooser { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; background: rgba(12,20,26,.96); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; width: min(360px, 92%); box-shadow: 0 30px 70px rgba(0,0,0,.6); backdrop-filter: blur(10px); animation: pop .25s var(--ease); }
-.chooser .ch-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--avorio); margin-bottom: 4px; }
-.chooser .ch-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--avorio); text-align: left; }
-.chooser .ch-opt:hover, .chooser .ch-opt:active { background: rgba(255,255,255,.14); border-color: var(--oro-2); }
-.chooser .ch-opt .k { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--basilico); color: #fff; white-space: nowrap; }
-.chooser .ch-opt .k.fifteen { background: var(--rosso); } .chooser .ch-opt .k.ace { background: var(--oro); color: var(--inchiostro); }
-.chooser .ch-opt .minicards { flex: 1; }
-.chooser .ch-opt .sc { color: var(--oro-2); font-size: 13px; }
-.chooser .ch-cancel { background: none; border: none; color: var(--testo-2); padding: 6px; font-size: 13px; }
-.chooser .mini { width: 34px; height: 48px; font-size: 15px; }
 @media (max-width: 520px) { .hintarc text { font-size: 13px; } }
 
 .review-bar { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 46; display: flex; align-items: center; gap: 10px; background: rgba(12,20,26,.9); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 13px; color: var(--testo-2); max-width: 96%; }
@@ -482,9 +472,7 @@ input { font: inherit; }
 @media (max-height: 520px) and (orientation: landscape) {
   :root { --card-w: 52px; --card-h: 76px; --radius: 6px; }
   .hintarc text { font-size: 12px; }
-  .chooser { padding: 10px; gap: 6px; }
-  .chooser .mini { width: 28px; height: 40px; font-size: 13px; }
-  .modal { max-height: 94vh; padding: 14px; }
+      .modal { max-height: 94vh; padding: 14px; }
   .modal h2 { font-size: 20px; margin-bottom: 2px; }
   .tbl th, .tbl td { padding: 3px 6px; font-size: 13px; }
 }
@@ -600,10 +588,7 @@ html.theme-memphis #game .dropzone #drop-fill { fill: rgba(255,210,63,.18) !impo
 html.theme-memphis #game .bottombar { background: #fff; border-top: 3px solid #1b1a24; }
 html.theme-memphis #game .vbtn { background: #fff; color: #1b1a24; border: 2px solid #1b1a24; box-shadow: 3px 3px 0 #1b1a24; }
 html.theme-memphis #game .vbtn.on { background: #19c3b1; } #game .vbtn.ptt.live { background: #e63946; color: #fff; }
-html.theme-memphis #game .chooser { background: #fff; color: #1b1a24; border: 3px solid #1b1a24; box-shadow: 8px 8px 0 #1b1a24; }
-html.theme-memphis #game .chooser .ch-title { color: #1b1a24; } #game .chooser .ch-opt { background: #f6f1e4; color: #1b1a24; border: 2px solid #1b1a24; }
-html.theme-memphis #game .chooser .ch-cancel { color: #1b1a24; }
-html.theme-memphis #game .fx .pill { background: #fff; border: 3px solid #1b1a24; box-shadow: 8px 8px 0 #1b1a24; }
+html.theme-memphis #game html.theme-memphis #game html.theme-memphis #game html.theme-memphis #game .fx .pill { background: #fff; border: 3px solid #1b1a24; box-shadow: 8px 8px 0 #1b1a24; }
 html.theme-memphis #game .fx .t { background: none; color: #e63946; -webkit-text-fill-color: #e63946; filter: none; text-shadow: 3px 3px 0 #ffd23f; }
 html.theme-memphis #game .fx small { color: #1b1a24; }
 html.theme-memphis #game .fx .rays { background: repeating-conic-gradient(from 0deg, rgba(255,210,63,.9) 0 7deg, transparent 7deg 18deg); }
@@ -726,12 +711,11 @@ html:not(.theme-memphis) #scr-home .home-cards .panel.tilt { transition: transfo
 /* campi: l'etichetta si schiarisce quando scrivi */
 html:not(.theme-memphis) #scr-home .field:focus-within label { color: #fff; }
 /* transizioni tra schermate */
-.screen { animation: screenIn .45s var(--out) both; }
-.screen.off { animation: none; }
+.screen.enter { animation: screenIn .45s var(--out) both; }
 @keyframes screenIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
-#game:not(.hidden) { animation: gameIn .55s var(--out) both; }
+#game.enter { animation: gameIn .55s var(--out) both; }
 @keyframes gameIn { from { opacity: 0; transform: scale(1.02); } to { opacity: 1; transform: none; } }
-#scr-home.intro { animation: none; }
+
 /* modali: entrano con molla, l'ombra del fondo sfuma */
 .modal { animation: modalIn .45s var(--spring); }
 @keyframes modalIn { from { transform: translateY(26px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -773,3 +757,25 @@ html.theme-memphis .node.locked { background: #e9e3d3; color: #8a8a8a; box-shado
 html.theme-memphis .node .lbl, html.theme-memphis .node .lbl i em { color: #1b1a24; } html.theme-memphis .node .lbl i { color: #e63946; }
 html.theme-memphis .path-map .trail { stroke: rgba(27,26,36,.35); } html.theme-memphis .path-map .trail.done { stroke: #e63946; }
 html.theme-memphis .starlist div { background: #f6f1e4; color: #1b1a24; border: 2px solid #1b1a24; }
+
+/* ===== scelta della presa ===== */
+.chooser-bg { position: absolute; inset: 0; z-index: 44; background: rgba(6,14,12,.45); animation: fadein .2s; }
+.chooser { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; width: min(380px, 92%); background: #1e2a33; border-radius: 22px; padding: 18px 16px 12px; box-shadow: 0 30px 70px rgba(0,0,0,.6); animation: modalIn .4s var(--spring); display: flex; flex-direction: column; gap: 10px; }
+.chooser .ch-title { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--avorio); text-align: center; margin-bottom: 2px; }
+.chooser .ch-sub { text-align: center; font-size: 13px; color: var(--testo-2); margin: -6px 0 6px; }
+.chooser .ch-opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,.08); background: rgba(255,255,255,.05); color: var(--avorio); text-align: left; transition: background .15s, border-color .15s, transform .25s var(--spring); }
+.chooser .ch-opt:hover, .chooser .ch-opt:active { background: rgba(255,255,255,.12); border-color: var(--oro-2); transform: scale(1.015); }
+.chooser .ch-opt .cards { display: flex; gap: 6px; align-items: center; }
+.chooser .ch-opt .cards .plus { color: var(--testo-2); font-weight: 800; font-size: 16px; }
+.chooser .ch-opt .mini { width: 42px; height: 60px; font-size: 18px; border-radius: 6px; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
+.chooser .ch-opt .mini svg { width: 14px; height: 14px; }
+.chooser .ch-opt .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.chooser .ch-opt .k { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--basilico); color: #fff; white-space: nowrap; font-weight: 700; letter-spacing: .02em; }
+.chooser .ch-opt .k.fifteen { background: var(--rosso); } .chooser .ch-opt .k.ace { background: var(--oro); color: var(--inchiostro); }
+.chooser .ch-opt .sc { color: var(--oro-2); font-size: 12px; font-weight: 700; }
+.chooser .ch-cancel { background: none; border: none; color: var(--testo-2); padding: 8px; font-size: 13px; margin-top: 2px; }
+html.theme-memphis .chooser { background: #fff; border: 3px solid #1b1a24; box-shadow: 8px 8px 0 #1b1a24; }
+html.theme-memphis .chooser .ch-title, html.theme-memphis .chooser .ch-cancel, html.theme-memphis .chooser .ch-opt { color: #1b1a24; }
+html.theme-memphis .chooser .ch-sub { color: #3c3a48; }
+html.theme-memphis .chooser .ch-opt { background: #f6f1e4; border: 2px solid #1b1a24; }
+html.theme-memphis .chooser .ch-opt:hover { background: #ffd23f; }

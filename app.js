@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010847';
+const APP_VERSION = '202610010852';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -201,9 +201,12 @@ const token = (() => { let t = Store.get('cpz-token'); if (!t) { t = Math.random
 const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
 
 function showScreen(id) {
-  $$('.screen').forEach(s => s.classList.toggle('off', s.id !== id));
-  $('#game').classList.toggle('hidden', id !== 'game');
+  $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); });
+  $('#game').classList.toggle('hidden', id !== 'game'); $('#game').classList.remove('enter');
+  if (showScreen.first) { showScreen.first = false; return; }
+  const el = id === 'game' ? $('#game') : $('#' + id); if (el) { void el.offsetWidth; el.classList.add('enter'); }
 }
+showScreen.first = true;
 
 /* =====================================================================
    HOST: gestisce stato, connessioni, bot
@@ -899,11 +902,15 @@ const Stage = {
   showChooser(id) {
     const view = App.view, opts = this.currentOptions || [];
     const box = $('#chooser'); box.innerHTML = '';
-    const h = document.createElement('div'); h.className = 'ch-title'; h.textContent = `Con ${cardShort(id)} puoi prendere:`; box.appendChild(h);
+    let bg = $('#chooser-bg'); if (!bg) { bg = document.createElement('div'); bg.id = 'chooser-bg'; bg.className = 'chooser-bg hidden'; box.parentNode.insertBefore(bg, box); }
+    bg.classList.remove('hidden'); bg.onclick = () => this.clearSelection();
+    const h = document.createElement('div'); h.className = 'ch-title'; h.textContent = 'Cosa prendi?'; box.appendChild(h);
+    const sub = document.createElement('div'); sub.className = 'ch-sub'; sub.textContent = `Con ${C.cardName(id)} puoi fare ${opts.length} prese diverse`; box.appendChild(sub);
     opts.forEach((o, i) => {
       const b = document.createElement('button'); b.className = 'ch-opt'; b.dataset.i = i;
-      const kind = o.kind === 'ace' ? 'asso piglia tutto' : o.kind === 'fifteen' ? 'fa 15' : 'presa';
-      b.innerHTML = `<span class="k ${o.kind}">${kind}</span><span class="minicards">${o.idx.map(k => miniCard(view.table[k].id)).join('')}</span>${o.scopa ? '<b class="sc">scopa!</b>' : ''}`;
+      const kind = o.kind === 'ace' ? 'asso piglia tutto' : o.kind === 'fifteen' ? 'fa 15' : 'carta uguale';
+      const label = o.kind === 'simple' && o.idx.length > 1 ? 'somma' : kind;
+      b.innerHTML = `<span class="cards">${o.idx.map(k => miniCard(view.table[k].id)).join('<span class="plus">+</span>')}</span><span class="meta"><span class="k ${o.kind}">${label}</span>${o.scopa ? '<span class="sc">scopa!</span>' : ''}</span>`;
       b.onmouseenter = () => this.focus(i); b.onmouseleave = () => this.focus(null);
       b.onclick = () => this.play(id, o.idx);
       box.appendChild(b);
@@ -933,7 +940,7 @@ const Stage = {
   clearSelection() {
     const had = this.selected;
     this.selected = null; this.floating = false; this.currentOptions = []; this.focused = null;
-    $('#choices').classList.add('hidden'); $('#chooser').classList.add('hidden');
+    $('#choices').classList.add('hidden'); $('#chooser').classList.add('hidden'); const cbg = $('#chooser-bg'); if (cbg) cbg.classList.add('hidden');
     this.showDropzone(false);
     if (App.view) {
       App.view.table.forEach(t => this.nodes.get(t.id)?.classList.remove('target', 'alt', 'target-dim'));
@@ -988,6 +995,7 @@ const Stage = {
         const k = card._it.table; const hits = this.currentOptions.map((o, i) => o.idx.includes(k) ? i : -1).filter(i => i >= 0);
         if (hits.length) f = hits[0];
       }
+      drag.overOpt = f;
       if (f !== this.focused) this.focus(f ?? (this.currentOptions.length === 1 ? 0 : null));
     };
     const cancel = ev => { drag.over = false; end(ev); };
@@ -1000,9 +1008,9 @@ const Stage = {
       if (!drag.moved) { if (drag.deselect) this.clearSelection(); return; }   // tocco: resta selezionata (o torna in mano)
       const opts = this.currentOptions || [];
       if (drag.over) {
-        if (this.focused != null && opts[this.focused]) return this.play(id, opts[this.focused].idx);
         if (opts.length === 0) return this.play(id, null);
         if (opts.length === 1) return this.play(id, opts[0].idx);
+        if (drag.overOpt != null && opts[drag.overOpt]) return this.play(id, opts[drag.overOpt].idx);   // lasciata sopra una carta precisa
         // più prese possibili: la carta resta sospesa in tavola e scegli nel riquadro
         this.floating = true;
         this.draw(this.layout(App.view));
