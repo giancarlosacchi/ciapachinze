@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010921';
+const APP_VERSION = '202610010926';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1666,11 +1666,12 @@ const ArcadeUI = {
     const stars = this.prog.stars[st.id] || 0;
     const list = Arcade.stagesFor(this.mode);
     const m = modal(`<h2>${esc(st.town)}<small>Tappa ${list.indexOf(st) + 1} · contro ${esc(st.who)}</small></h2>
-      <p>${esc(st.intro)}</p>
-      <div class="opt star" style="cursor:default"><span>★</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
-      <div class="opt star" style="cursor:default"><span>★★</span><span><b>Seconda stella</b><br>${esc(Arcade.goalText(st.star2))}</span></div>
-      <div class="opt star" style="cursor:default"><span>★★★</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
-      <p style="font-size:13px">Difficoltà del computer: ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]} · ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} finora</p>
+      <div class="stars-brief">
+        <div class="${stars >= 1 ? 'ok' : ''}"><span>★</span><span>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}</span></div>
+        <div class="${stars >= 2 ? 'ok' : ''}"><span>★★</span><span>${esc(Arcade.goalText(st.star2))}</span></div>
+        <div class="${stars >= 3 ? 'ok' : ''}"><span>★★★</span><span>${esc(Arcade.goalText(st.bonus))}</span></div>
+      </div>
+      <p style="font-size:13px;color:var(--testo-2)">${st.deals ? (st.deals === 1 ? 'Una smazzata' : st.deals + ' smazzate') : 'Partita a ' + st.target} · computer ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]}</p>
       <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">${this.mode === 'coop' ? 'Apri il tavolo e invita' : 'Gioca'}</button></div>`);
     m.querySelector('#stage-go').onclick = () => { m.remove(); this.mode === 'coop' ? this.startCoop(st) : this.start(st); };
   },

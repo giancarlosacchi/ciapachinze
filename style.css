@@ -843,3 +843,14 @@ html.theme-memphis .chooser .ch-opt { background: #f6f1e4; border: 2px solid #1b
 html.theme-memphis .chooser .ch-opt:hover { background: #ffd23f; }
 #game.landscape .goalbar { right: auto; left: 60px; top: 8px; }
 #game.landscape .goalbar .goalpop { right: auto; left: 0; transform-origin: top left; }
+
+/* riquadro tappa: solo le tre stelle con la condizione */
+.stars-brief { margin: 12px 0 6px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.08); padding: 4px 14px; }
+.stars-brief > div { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.07); font-size: 14px; line-height: 1.35; color: var(--avorio); }
+.stars-brief > div:first-child { border-top: 0; }
+.stars-brief > div > span:first-child { color: var(--oro-2); font-size: 13px; letter-spacing: -1px; white-space: nowrap; }
+.stars-brief > div.ok > span:first-child { color: #9be39b; }
+.stars-brief > div.ok > span:last-child { color: #9be39b; }
+html.theme-memphis .stars-brief { background: #fff; border: 2px solid #1b1a24; box-shadow: 3px 3px 0 #1b1a24; }
+html.theme-memphis .stars-brief > div { color: #1b1a24; border-top-color: rgba(27,26,36,.15); }
+html.theme-memphis .stars-brief > div > span:first-child { color: #e63946; }
