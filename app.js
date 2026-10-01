@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010852';
+const APP_VERSION = '202610010907';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -76,40 +76,54 @@ window.Store = Store;
    Suoni (sintetizzati, nessun file)
    ===================================================================== */
 const Sound = (() => {
-  let ctx = null, on = Store.get('cpz-sound') !== 'off';
-  const ac = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
-  function tone(f, t0, dur, type = 'sine', g = .18) {
-    const a = ac(), o = a.createOscillator(), gn = a.createGain();
-    o.type = type; o.frequency.setValueAtTime(f, a.currentTime + t0);
-    gn.gain.setValueAtTime(0, a.currentTime + t0);
-    gn.gain.linearRampToValueAtTime(g, a.currentTime + t0 + .01);
-    gn.gain.exponentialRampToValueAtTime(.0001, a.currentTime + t0 + dur);
-    o.connect(gn).connect(a.destination); o.start(a.currentTime + t0); o.stop(a.currentTime + t0 + dur + .05);
+  /* Suoni sintetizzati con cura: materiali (carta, panno), note con inviluppo morbido, riverbero leggero. */
+  let ctx = null, master = null, verb = null, on = Store.get('cpz-sound') !== 'off';
+  function ac() {
+    if (ctx) return ctx;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = .9;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+    // riverbero a convoluzione con coda sintetica (1.6 s)
+    const len = Math.floor(ctx.sampleRate * 1.6), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8) * .5; }
+    verb = ctx.createConvolver(); verb.buffer = buf; const vg = ctx.createGain(); vg.gain.value = .22;
+    master.connect(comp).connect(ctx.destination); master.connect(verb).connect(vg).connect(comp);
+    return ctx;
   }
-  function noise(t0, dur, g = .12) {
-    const a = ac(), b = a.createBuffer(1, a.sampleRate * dur, a.sampleRate), d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const s = a.createBufferSource(), gn = a.createGain(), f = a.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 1800; s.buffer = b; gn.gain.value = g;
-    s.connect(f).connect(gn).connect(a.destination); s.start(a.currentTime + t0);
+  const now = () => ac().currentTime;
+  function env(node, t0, a, d, s, r, peak = 1) { const g = node.gain; g.cancelScheduledValues(t0); g.setValueAtTime(0, t0); g.linearRampToValueAtTime(peak, t0 + a); g.exponentialRampToValueAtTime(Math.max(.0001, peak * s), t0 + a + d); g.exponentialRampToValueAtTime(.0001, t0 + a + d + r); }
+  function note(freq, t0, { a = .01, d = .12, s = .3, r = .4, type = 'sine', vol = .2, detune = 0, lp = 6000 } = {}) {
+    const a_ = ac(), o = a_.createOscillator(), g = a_.createGain(), f = a_.createBiquadFilter();
+    o.type = type; o.frequency.setValueAtTime(freq, t0); o.detune.value = detune; f.type = 'lowpass'; f.frequency.value = lp;
+    env(g, t0, a, d, s, r, vol); o.connect(f).connect(g).connect(master); o.start(t0); o.stop(t0 + a + d + r + .05);
   }
-  const play = name => {
-    if (!on) return;
-    try {
-      if (ac().state === 'suspended') ac().resume();
-      switch (name) {
-        case 'card': noise(0, .09, .1); break;
-        case 'take': noise(0, .07, .08); tone(520, .03, .12, 'triangle', .06); break;
-        case 'scopa': [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .08, .35, 'triangle', .14)); break;
-        case 'buona': tone(90, 0, .18, 'sine', .4); tone(90, .22, .18, 'sine', .4); noise(0, .05, .2); noise(.22, .05, .2); break;
-        case 'turn': tone(880, 0, .18, 'sine', .08); break;
-        case 'win': [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * .12, .6, 'triangle', .16)); break;
-        case 'lose': [440, 415, 392].forEach((f, i) => tone(f, i * .25, .5, 'sine', .12)); break;
-        case 'ptt': tone(1200, 0, .06, 'square', .05); break;
-        case 'deal': for (let i = 0; i < 6; i++) noise(i * .06, .05, .05); break;
-      }
-    } catch (e) { /* audio non disponibile */ }
+  // campanella morbida: fondamentale + armonica a 2.76x (campana) che decade più in fretta
+  function bell(freq, t0, vol = .18, dur = .9) {
+    note(freq, t0, { a: .004, d: dur * .6, s: .15, r: dur * .4, type: 'sine', vol });
+    note(freq * 2.76, t0, { a: .002, d: dur * .25, s: .05, r: dur * .2, type: 'sine', vol: vol * .35 });
+    note(freq * 1.005, t0, { a: .004, d: dur * .5, s: .1, r: dur * .3, type: 'triangle', vol: vol * .25, lp: 3000 });
+  }
+  function noise(t0, dur, { bp = 1800, q = .8, vol = .1, hp = 200 } = {}) {
+    const a_ = ac(), b = a_.createBuffer(1, Math.ceil(a_.sampleRate * dur), a_.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+    const src = a_.createBufferSource(), g = a_.createGain(), f = a_.createBiquadFilter(), h = a_.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = bp; f.Q.value = q; h.type = 'highpass'; h.frequency.value = hp; src.buffer = b;
+    env(g, t0, .003, dur * .4, .2, dur * .6, vol);
+    src.connect(h).connect(f).connect(g).connect(master); src.start(t0);
+  }
+  const SFX = {
+    card() { const t = now(); noise(t, .09, { bp: 2600, q: .6, vol: .07 }); noise(t + .02, .06, { bp: 900, q: 1, vol: .05 }); },              // carta posata sul panno
+    take() { const t = now(); noise(t, .07, { bp: 3000, q: .7, vol: .06 }); bell(880, t + .01, .06, .35); },                                   // presa
+    deal() { const t = now(); for (let i = 0; i < 6; i++) noise(t + i * .055, .05, { bp: 2400 + i * 120, q: .7, vol: .05 }); },                // distribuzione
+    turn() { const t = now(); bell(1318, t, .07, .5); },                                                                                          // tocca a te (La alto, sottile)
+    scopa() { const t = now(); [659, 880, 1108, 1318].forEach((f, i) => bell(f, t + i * .07, .14, 1.1)); noise(t, .12, { bp: 5000, q: .5, vol: .05 }); },  // arpeggio Mi maggiore
+    buona() { const t = now(); note(110, t, { a: .005, d: .18, s: .1, r: .25, type: 'sine', vol: .5, lp: 400 }); note(110, t + .26, { a: .005, d: .18, s: .1, r: .3, type: 'sine', vol: .5, lp: 400 }); noise(t, .04, { bp: 500, q: 1, vol: .25, hp: 80 }); noise(t + .26, .04, { bp: 500, q: 1, vol: .25, hp: 80 }); bell(1760, t + .55, .08, .8); }, // due colpi sul tavolo + campanella
+    win() { const t = now(); [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => bell(f, t + i * .11, .14, 1.4)); [523, 784].forEach(f => note(f / 2, t + .66, { a: .02, d: .6, s: .3, r: 1.2, type: 'triangle', vol: .12, lp: 1500 })); },
+    lose() { const t = now(); [392, 370, 349, 311].forEach((f, i) => note(f, t + i * .22, { a: .02, d: .25, s: .3, r: .5, type: 'triangle', vol: .12, lp: 1200 })); },
+    ptt() { const t = now(); bell(1976, t, .05, .25); },
+    tap() { const t = now(); noise(t, .03, { bp: 3500, q: 1, vol: .04 }); },
   };
+  const play = name => { if (!on || !SFX[name]) return; try { if (ac().state === 'suspended') ac().resume(); SFX[name](); } catch (e) {} };
   return { play, get on() { return on; }, set on(v) { on = v; Store.set('cpz-sound', v ? 'on' : 'off'); } };
 })();
 
@@ -416,9 +430,15 @@ const Session = {
   clear() { try { localStorage.removeItem('cpz-session'); } catch (e) {} },
 };
 async function hostRoom(cfg, name, solo, reuseCode) {
-  App.mode = solo ? 'solo' : 'host'; App.myName = name; App.mySeat = 0; App.cfg = cfg; App.rotateSkipped = false; setTimeout(updateOrientation, 0);
+  App.mode = solo ? 'solo' : 'host'; App.myName = name; App.mySeat = 0; App.cfg = cfg; App.rotateSkipped = false; App.pendingStart = false; setTimeout(updateOrientation, 0);
   Host.init(cfg, name, solo);
-  if (solo) { App.code = 'LOCALE'; App.roster = Host.roster(); Host.startGame(); return; }
+  if (solo) {
+    App.code = 'LOCALE'; App.roster = Host.roster();
+    // nel 2 contro 2 sul telefono in verticale: aspetta che il telefono sia girato (o che si scelga di restare in verticale) prima di dare le carte
+    const portraitPhone = window.innerWidth < 640 && window.innerWidth <= window.innerHeight;
+    if (cfg.players === 4 && portraitPhone) { App.pendingStart = true; updateOrientation(); return; }
+    Host.startGame(); return;
+  }
   App.code = reuseCode || genCode();
   $('#lobby-code').textContent = App.code;
   $('#lobby-status').textContent = 'Connessione al servizio…';
@@ -594,7 +614,7 @@ const Stage = {
       return { x: cw * .85 + 10, y: top, rot: 12, dir: 'h', compact: true };
     }
     const L = this.landscape;
-    if (rel === 0) return { x: W / 2, y: H - ch / 2 - (L ? 6 : 18), rot: 0, dir: 'h' };
+    if (rel === 0) return { x: W / 2, y: H - ch / 2 - (L ? 20 : 18), rot: 0, dir: 'h' };
     if (n === 2 || rel === 2) return { x: W / 2, y: ch / 2 + (L ? 6 : 22), rot: 0, dir: 'h' };
     if (rel === 1) return { x: W - ch / 2 - (L ? 10 : 16), y: H / 2 - (L ? 14 : 0), rot: -90, dir: 'v' };
     return { x: ch / 2 + (L ? 10 : 16), y: H / 2 - (L ? 14 : 0), rot: 90, dir: 'v' };
@@ -613,7 +633,7 @@ const Stage = {
       const top = this.seatAnchor(view.cfg.players === 4 ? 1 : 1, view);
       return team === my ? { x: 6, y: this.H - ch * k - ch * 1.9 } : { x: this.W - cw * k - 30, y: view.cfg.players === 4 ? top.y + ch * .6 + 30 : top.y - ch * k / 2 + 6 };
     }
-    if (this.landscape) return team === my ? { x: 14, y: this.H - ch * k - 8 } : { x: this.W - cw * k - 14, y: 10 };
+    if (this.landscape) return team === my ? { x: 14, y: this.H - ch * k - 20 } : { x: this.W - cw * k - 14, y: 10 };
     return team === my ? { x: 26 + (ch - cw) / 2, y: this.H - ch - 30 } : { x: this.W - cw - 26 - (ch - cw) / 2, y: 70 };
   },
   tableSlots(count) {
@@ -1108,8 +1128,8 @@ const Stage = {
     const d = document.createElement('div'); d.className = 'fx ' + cls;
     const suits = ['♥', '♦', '♣', '♠'];
     let flying = '';
-    for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2 + Math.random() * .3, r = 120 + Math.random() * 90; flying += `<i style="--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px;--r:${(Math.random() * 360 - 180).toFixed(0)}deg;animation-delay:${(Math.random() * .15).toFixed(2)}s">${suits[i % 4]}</i>`; }
-    d.innerHTML = `<div class="rays"></div><div class="ring"></div><div class="ring r2"></div><div class="suits">${flying}</div><div class="pill"><span class="t">${esc(text)}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2 + (Math.random() - .5) * .4, r = 150 + Math.random() * 110; flying += `<i style="--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r * .7).toFixed(0)}px;--r:${(Math.random() * 300 - 150).toFixed(0)}deg;animation-delay:${(Math.random() * .12).toFixed(2)}s">${suits[i % 4]}</i>`; }
+    d.innerHTML = `<div class="glow"></div><div class="ring"></div><div class="suits">${flying}</div><div class="ribbon"><span class="t">${esc(text)}</span></div>${sub ? `<small>${esc(sub)}</small>` : ''}`;
     w.appendChild(d); this.wrap.appendChild(w);
     // il campo dietro si abbassa e si sfoca per un attimo: la scritta resta leggibile
     this.wrap.classList.add('fxon'); clearTimeout(this.fxTimer);
@@ -1573,7 +1593,7 @@ Voice.ui();
 const ArcadeUI = {
   prog: null, stage: null, dealsPlayed: 0, goalDone: false, bonusDone: false, mode: 'solo',
   open() { this.prog = Arcade.load(); this.renderMap(); showScreen('scr-arcade'); },
-  setMode(m) { this.mode = m; $$('#arcade-mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); this.renderMap(); },
+  setMode(m) { this.mode = m; this.renderMap(); },
   homeProgress() {
     const p = Arcade.load(); const done = p.stats.stagesDone, tot = Arcade.STAGES.length, stars = Arcade.totalStars(p);
     $('#arcade-progress').innerHTML = `<span>${done}/${tot} tappe</span><div class="bar"><i style="width:${Math.round(done / tot * 100)}%"></i></div><span>★ ${stars}</span>`;
@@ -1581,40 +1601,37 @@ const ArcadeUI = {
   },
   renderMap() {
     const p = this.prog; const list = Arcade.stagesFor(this.mode);
-    $('#stars-total').textContent = `★ ${list.reduce((a, st) => a + (p.stars[st.id] || 0), 0)} / ${list.length * 3}`;
-    $('#arcade-note').textContent = this.mode === 'coop' ? 'A coppie: apri il tavolo, invita un amico con il codice e affrontate insieme due computer. Il progresso resta su questo telefono.' : '';
+    const tot = list.reduce((a, st) => a + (p.stars[st.id] || 0), 0), done = list.filter(st => (p.stars[st.id] || 0) >= 1).length;
+    $('#stars-total').textContent = `★ ${tot} / ${list.length * 3}`;
+    $('#arcade-note').textContent = this.mode === 'coop' ? 'A coppie: apri il tavolo, invita un amico con il codice e affrontate insieme due computer.' : '';
+    $('#arcade-summary').innerHTML = `<div class="sum"><b>${done}</b><span>tappe su ${list.length}</span></div><div class="sum"><b>${tot}</b><span>stelle su ${list.length * 3}</span></div><div class="sum"><b>${p.unlocked.length}</b><span>traguardi</span></div>`;
     const map = $('#map'); map.innerHTML = '';
-    // sentiero a serpentina: una tappa ogni 120px, alternando sinistra e destra
-    const W = Math.min(map.clientWidth || 360, 560), stepY = 118, padY = 70, n = list.length;
+    // sentiero verticale che scende: una tappa per riga, leggera onda a sinistra/destra
+    const W = Math.min(map.clientWidth || 360, 520), stepY = 104, padY = 60, n = list.length;
     const H = padY * 2 + stepY * (n - 1);
-    const xs = i => W / 2 + (W * 0.3) * Math.sin(i * 1.1 + 0.6);
-    const pts = list.map((st, i) => ({ x: xs(i), y: H - padY - i * stepY }));
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const cy = (a.y + b.y) / 2; d += ` C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`; }
-    let nextFound = false, lastDoneIdx = -1;
-    list.forEach((st, i) => { if ((p.stars[st.id] || 0) >= 1) lastDoneIdx = i; });
+    const amp = Math.min(70, W * 0.16);
+    const pts = list.map((st, i) => ({ x: W / 2 + amp * Math.sin(i * 0.9), y: padY + i * stepY }));
+    const curve = (upto) => { let d = `M ${pts[0].x} ${pts[0].y}`; for (let i = 1; i <= upto; i++) { const a = pts[i - 1], b = pts[i]; const cy = (a.y + b.y) / 2; d += ` C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`; } return d; };
+    let lastDoneIdx = -1; list.forEach((st, i) => { if ((p.stars[st.id] || 0) >= 1) lastDoneIdx = i; });
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.classList.add('path-map');
-    // zone bands
     let bands = '';
-    Arcade.ZONES.forEach((z, zi) => { const idx = list.map((st, i) => st.zone === zi ? i : -1).filter(i => i >= 0); if (!idx.length) return; const y1 = pts[idx[idx.length - 1]].y - stepY / 2, y2 = pts[idx[0]].y + stepY / 2; bands += `<rect x="0" y="${Math.max(0, y1)}" width="${W}" height="${Math.min(H, y2) - Math.max(0, y1)}" fill="${z.color}" opacity=".07"/><text x="${W - 12}" y="${Math.max(0, y1) + 20}" text-anchor="end" class="zone-lbl" fill="${z.color}">${esc(z.name)}</text>`; });
-    // path: done part bright, rest dashed
-    const donePath = lastDoneIdx >= 0 ? (() => { let dd = `M ${pts[0].x} ${pts[0].y}`; for (let i = 1; i <= Math.min(lastDoneIdx + 1, n - 1); i++) { const a = pts[i - 1], b = pts[i]; const cy = (a.y + b.y) / 2; dd += ` C ${a.x} ${cy}, ${b.x} ${cy}, ${b.x} ${b.y}`; } return dd; })() : '';
-    svg.innerHTML = `${bands}<path d="${d}" class="trail"/>${donePath ? `<path d="${donePath}" class="trail done"/>` : ''}`;
+    Arcade.ZONES.forEach((z, zi) => { const idx = list.map((st, i) => st.zone === zi ? i : -1).filter(i => i >= 0); if (!idx.length) return; const y1 = pts[idx[0]].y - stepY / 2, y2 = pts[idx[idx.length - 1]].y + stepY / 2; bands += `<rect x="0" y="${Math.max(0, y1)}" width="${W}" height="${Math.min(H, y2) - Math.max(0, y1)}" rx="18" fill="${z.color}" opacity=".08"/><text x="${W - 14}" y="${Math.max(0, y1) + 22}" text-anchor="end" class="zone-lbl" fill="${z.color}">${esc(z.name)}</text>`; });
+    svg.innerHTML = `${bands}<path d="${curve(n - 1)}" class="trail"/>${lastDoneIdx >= 0 ? `<path d="${curve(Math.min(lastDoneIdx + 1, n - 1))}" class="trail done"/>` : ''}`;
     map.appendChild(svg);
+    let nextFound = false;
     list.forEach((st, i) => {
       const stars = p.stars[st.id] || 0, unlocked = Arcade.isUnlockedIn(p, list, st.id);
       const isNext = unlocked && stars === 0 && !nextFound; if (isNext) nextFound = true;
       const b = document.createElement('button'); b.className = 'node' + (stars ? ' done' : '') + (isNext ? ' next' : '') + (unlocked ? '' : ' locked') + (st.players === 4 ? ' four' : '');
       b.style.left = pts[i].x + 'px'; b.style.top = pts[i].y + 'px'; b.disabled = !unlocked;
       const side = pts[i].x < W / 2 ? 'r' : 'l';
-      b.innerHTML = `<span class="pin">${unlocked ? (i + 1) : '🔒'}</span><span class="lbl ${side}"><b>${esc(st.town)}</b><i>${'★'.repeat(stars)}<em>${'★'.repeat(3 - stars)}</em></i></span>`;
+      const lock = '<svg viewBox="0 0 20 20" width="18" height="18"><rect x="4" y="9" width="12" height="9" rx="2" fill="currentColor"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+      b.innerHTML = `<span class="pin">${unlocked ? (stars ? '★' : (i + 1)) : lock}</span><span class="lbl ${side}"><b>${esc(st.town)}</b><i>${'★'.repeat(stars)}<em>${'★'.repeat(3 - stars)}</em></i></span>`;
       b.onclick = () => this.brief(st);
-      b.title = st.who;
       map.appendChild(b);
     });
-    // scorri fino alla tappa da giocare
-    const target = map.querySelector('.node.next') || map.querySelector('.node.done:last-of-type');
+    const target = map.querySelector('.node.next') || map.querySelectorAll('.node.done')[lastDoneIdx];
     if (target) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
   },
   brief(st) {
@@ -1622,9 +1639,9 @@ const ArcadeUI = {
     const list = Arcade.stagesFor(this.mode);
     const m = modal(`<h2>${esc(st.town)}<small>Tappa ${list.indexOf(st) + 1} · contro ${esc(st.who)}</small></h2>
       <p>${esc(st.intro)}</p>
-      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
-      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★★</span><span><b>Seconda stella</b><br>${esc(Arcade.goalText(st.star2))}</span></div>
-      <div class="opt" style="cursor:default"><span style="font-size:22px;color:var(--oro-2)">★★★</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
+      <div class="opt star" style="cursor:default"><span>★</span><span><b>Obiettivo</b><br>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}${st.deals ? ` · ${st.deals === 1 ? 'una smazzata' : st.deals + ' smazzate'}` : ` · partita a ${st.target}`}</span></div>
+      <div class="opt star" style="cursor:default"><span>★★</span><span><b>Seconda stella</b><br>${esc(Arcade.goalText(st.star2))}</span></div>
+      <div class="opt star" style="cursor:default"><span>★★★</span><span><b>Terza stella</b><br>${esc(Arcade.goalText(st.bonus))}</span></div>
       <p style="font-size:13px">Difficoltà del computer: ${['ingenuo', 'medio', 'furbo', 'campione'][st.level]} · ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} finora</p>
       <div class="actions"><button class="btn ghost" onclick="this.closest('.modal-bg').remove()">Indietro</button><button class="btn oro" id="stage-go">${this.mode === 'coop' ? 'Apri il tavolo e invita' : 'Gioca'}</button></div>`);
     m.querySelector('#stage-go').onclick = () => { m.remove(); this.mode === 'coop' ? this.startCoop(st) : this.start(st); };
@@ -1651,8 +1668,20 @@ const ArcadeUI = {
   goalbar() {
     let g = $('#goalbar'); if (!g) { g = document.createElement('div'); g.id = 'goalbar'; g.className = 'goalbar'; $('#stage-wrap').appendChild(g); }
     const st = this.stage; if (!st) { g.classList.add('hidden'); return; }
+    if (!st.star2) Arcade.stagesFor(st.coop || st.players === 4 && Arcade.COOP_STAGES.includes(st) ? 'coop' : 'solo');
     g.classList.remove('hidden');
-    g.innerHTML = `🎯 <b>${esc(Arcade.goalText(st.goal))}</b>${st.deals ? ` · smazzata ${this.dealsPlayed + 1}/${st.deals}` : ''}`;
+    const deals = st.deals ? `<span class="n">${this.dealsPlayed + 1}/${st.deals}</span>` : '';
+    g.innerHTML = `<button class="goalbtn" type="button" aria-label="Obiettivi della tappa">★${deals}</button>
+      <div class="goalpop">
+        <b class="town">${esc(st.town)}</b>
+        <div class="${this.goalDone ? 'ok' : ''}"><span>★</span><span>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}</span></div>
+        <div class="${this.goalDone && this.star2Done ? 'ok' : ''}"><span>★★</span><span>${esc(Arcade.goalText(st.star2))}</span></div>
+        <div class="${this.goalDone && this.bonusDone ? 'ok' : ''}"><span>★★★</span><span>${esc(Arcade.goalText(st.bonus))}</span></div>
+        ${st.deals ? `<small>Smazzata ${this.dealsPlayed + 1} di ${st.deals}</small>` : `<small>Partita a ${st.target}</small>`}
+      </div>`;
+    const btn = g.querySelector('.goalbtn');
+    btn.onclick = e => { e.stopPropagation(); g.classList.toggle('open'); Sound.play('tap'); };
+    if (!g._bound) { g._bound = true; document.addEventListener('pointerdown', e => { if (!g.contains(e.target)) g.classList.remove('open'); }); }
   },
   /* chiamato a fine smazzata (solo mode arcade) → ritorna true se la tappa è finita */
   onDealEnd(view) {
@@ -1713,7 +1742,7 @@ const ArcadeUI = {
   },
 };
 $('#btn-arcade').onclick = () => ArcadeUI.open();
-$$('#arcade-mode button').forEach(b => b.onclick = () => ArcadeUI.setMode(b.dataset.v));
+seg('#arcade-mode', v => ArcadeUI.setMode(v));
 $('#arcade-back').onclick = () => { showScreen('scr-home'); ArcadeUI.homeProgress(); };
 $('#btn-achievements').onclick = () => {
   const p = Arcade.load();
@@ -1726,8 +1755,10 @@ Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgr
 function updateOrientation() {
   const four = (App.view && App.view.cfg.players === 4) || (!App.view && App.cfg && App.cfg.players === 4 && (App.mode === 'host' || App.mode === 'guest' || App.mode === 'solo'));
   const portraitPhone = window.innerWidth < 640 && window.innerWidth <= window.innerHeight;
-  $('#rotate').classList.toggle('hidden', !(four && portraitPhone) || App.rotateSkipped);
+  const showRotate = four && portraitPhone && !App.rotateSkipped;
+  $('#rotate').classList.toggle('hidden', !showRotate);
   $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
+  if (App.pendingStart && !showRotate && App.mode === 'solo' && !Host.started) { App.pendingStart = false; setTimeout(() => Host.startGame(), 350); }
   if (four && portraitPhone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
 }
 window.addEventListener('resize', () => updateOrientation());
@@ -1752,5 +1783,5 @@ const Updater = {
 setTimeout(() => Updater.check(false), 4000);
 // service worker: la pagina e i file si prendono sempre dalla rete quando c'è, dalla copia locale quando non c'è
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
-window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, busy: () => processing || queue.length > 0 };
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, busy: () => processing || queue.length > 0 };
 })();
