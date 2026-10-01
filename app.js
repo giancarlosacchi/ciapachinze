@@ -1388,7 +1388,10 @@ applyName();
 $('#btn-change-name').onclick = () => openSettings();
 const myName = () => ($('#host-name').value.trim() || $('#join-name').value.trim() || Store.get('cpz-name') || '').trim();
 const hashCode = (location.hash || '').replace('#', '').toUpperCase();
-if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; setTimeout(() => $('#join-name').focus(), 100); }
+if (hashCode && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; }
+// nessun campo prende il fuoco all'apertura: la tastiera compare solo quando tocchi un campo
+window.addEventListener('load', () => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
 
 function needName(input) { const n = myName(); if (!n) { $$('.name-field').forEach(f => f.classList.remove('hidden')); input.focus(); toast('Scrivi prima il tuo nome'); return null; } Store.set('cpz-name', n); applyName(); return n; }
 $('#btn-host').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, false); };
