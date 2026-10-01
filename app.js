@@ -1086,7 +1086,11 @@ const Stage = {
   },
   fx(text, sub, cls = '') {
     const d = document.createElement('div'); d.className = 'fx ' + cls; d.innerHTML = esc(text) + (sub ? `<small>${esc(sub)}</small>` : '');
-    this.wrap.appendChild(d); setTimeout(() => d.remove(), 1600);
+    this.wrap.appendChild(d);
+    // il campo dietro si abbassa e si sfoca per un attimo: la scritta resta leggibile
+    this.wrap.classList.add('fxon'); clearTimeout(this.fxTimer);
+    this.fxTimer = setTimeout(() => this.wrap.classList.remove('fxon'), 1150);
+    setTimeout(() => d.remove(), 1600);
   },
   sparks() {
     const colors = ['#d9a621', '#f0c750', '#c8202f', '#f6f0e1', '#7fa36c'];
