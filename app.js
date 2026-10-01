@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011709';
+const APP_VERSION = '202610011713';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1720,9 +1720,22 @@ function openSettings() {
       <p style="font-size:13px;margin:6px 0">Tutto è salvato su questo telefono e resta anche dopo gli aggiornamenti dell'app. Per portarlo su un altro telefono copia il codice e incollalo lì.</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost" id="opt-export">Copia codice di salvataggio</button><button class="btn sm ghost" id="opt-import">Incolla un codice</button></div>
     </details>
-    <p style="font-size:12px;color:var(--testo-2);margin:6px 0 0">Versione ${APP_VERSION} · <button class="linkish" id="opt-update" style="font-size:12px">Controlla aggiornamenti</button></p>
+    <p style="font-size:12px;color:var(--testo-2);margin:6px 0 0">Versione ${APP_VERSION} · <button class="linkish" id="opt-update" style="font-size:12px">Controlla aggiornamenti</button> · <button class="linkish" id="opt-diag" style="font-size:12px">Diagnostica</button></p>
+    <pre id="diag" class="hidden" style="font-size:11px;white-space:pre-wrap;background:rgba(0,0,0,.25);padding:8px;border-radius:8px;margin:6px 0 0"></pre>
     <div class="actions"><button class="btn ghost" id="opt-rules">Regole</button><button class="btn" id="opt-close">Salva e chiudi</button></div>`);
   m.querySelector('#opt-update').onclick = () => Updater.check(true);
+  m.querySelector('#opt-diag').onclick = () => {
+    const d = m.querySelector('#diag'); d.classList.toggle('hidden');
+    const so = screen.orientation || {};
+    d.textContent = [
+      'versione ' + APP_VERSION,
+      'modalità: ' + (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app installata' : 'browser') + (document.fullscreenElement ? ' (schermo intero)' : ''),
+      'finestra: ' + window.innerWidth + '×' + window.innerHeight + ' · schermo: ' + screen.width + '×' + screen.height,
+      'orientamento: ' + (so.type || '?') + ' (' + (so.angle != null ? so.angle + '°' : '?') + ') · blocco: ' + (so.lock ? 'disponibile' : 'no'),
+      'browser: ' + navigator.userAgent,
+    ].join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(d.textContent) : Promise.reject()).then(() => toast('Diagnostica copiata'), () => {});
+  };
   m.querySelectorAll('#opt-theme button').forEach(b => b.onclick = () => { Settings.theme = b.dataset.v; m.querySelectorAll('#opt-theme button').forEach(x => x.classList.toggle('on', x === b)); });
   const nameIn = m.querySelector('#opt-name');
   const saveName = () => { const v = nameIn.value.trim(); if (v) { Store.set('cpz-name', v); applyName(); } };
