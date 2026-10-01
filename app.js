@@ -142,7 +142,7 @@ const Settings = {
 };
 // colori dei semi: classici (rosso/nero) oppure a quattro colori come nei casinò (♥ rosso, ♦ blu, ♣ verde, ♠ nero)
 function suitColor(s) {
-  if (Settings.fourColor) return { H: '#c8202f', D: '#1f5fbf', C: '#1f8a3c', S: '#1b1a24' }[s];
+  if (Settings.fourColor) return { H: '#1f5fbf', D: '#c8202f', C: '#1f8a3c', S: '#1b1a24' }[s];
   return (s === 'H' || s === 'D') ? '#c8202f' : '#1b1a24';
 }
 function cardSVG(id, mattaVal) {
@@ -1404,7 +1404,7 @@ $('#btn-rules').onclick = () => openSettings();
 function openSettings() {
   const m = modal(`<h2>Impostazioni</h2>
     <div class="field"><label for="opt-name">Il tuo nome</label><input id="opt-name" maxlength="16" placeholder="es. Mario Rossi" value="${esc(Store.get('cpz-name') || '')}"></div>
-    <label class="opt"><input type="checkbox" id="opt-4col" ${Settings.fourColor ? 'checked' : ''}> <span><b>Carte a quattro colori</b><br><small>♥ rosso, ♦ blu, ♣ verde, ♠ nero: i semi si riconoscono al volo</small></span></label>
+    <label class="opt"><input type="checkbox" id="opt-4col" ${Settings.fourColor ? 'checked' : ''}> <span><b>Carte a quattro colori</b><br><small>♦ rosso, ♥ blu, ♣ verde, ♠ nero: i semi si riconoscono al volo</small></span></label>
     <label class="opt"><input type="checkbox" id="opt-sound" ${Sound.on ? 'checked' : ''}> <span><b>Suoni</b></span></label>
     <details class="backup"><summary>Salvataggi (nome, arcade, storico)</summary>
       <p style="font-size:13px;margin:6px 0">Tutto è salvato su questo telefono e resta anche dopo gli aggiornamenti dell'app. Per portarlo su un altro telefono copia il codice e incollalo lì.</p>
