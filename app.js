@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010834';
+const APP_VERSION = '202610010837';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1399,7 +1399,39 @@ function seg(id, cb) {
   // pastiglia che scivola sotto l'opzione scelta
   let thumb = el.querySelector('.thumb'); if (!thumb) { thumb = document.createElement('span'); thumb.className = 'thumb'; el.prepend(thumb); }
   const place = (animate = true) => { const on = el.querySelector('button.on'); if (!on) return; if (!animate) thumb.style.transition = 'none'; thumb.style.left = on.offsetLeft + 'px'; thumb.style.width = on.offsetWidth + 'px'; if (!animate) requestAnimationFrame(() => { thumb.style.transition = ''; }); };
-  el.querySelectorAll('button').forEach(b => b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); place(); cb(b.dataset.v); });
+  const choose = (b, animate = true) => { if (!b || b.classList.contains('on')) { place(animate); return; } el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); place(animate); cb(b.dataset.v); };
+  el.querySelectorAll('button').forEach(b => b.onclick = () => choose(b));
+  // trascinamento: la pastiglia segue il dito e si aggancia all'opzione più vicina
+  let drag = null;
+  el.addEventListener('pointerdown', e => {
+    if (document.documentElement.classList.contains('theme-memphis')) return;
+    const on = el.querySelector('button.on'); if (!on) return;
+    drag = { x0: e.clientX, left0: on.offsetLeft, w: on.offsetWidth, moved: false, id: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch (x) {}
+  });
+  el.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x0; if (!drag.moved && Math.abs(dx) < 6) return;
+    drag.moved = true; thumb.style.transition = 'none'; el.classList.add('dragging');
+    const min = 4, max = el.clientWidth - drag.w - 4;
+    const left = Math.max(min, Math.min(max, drag.left0 + dx));
+    thumb.style.left = left + 'px';
+    // evidenzia l'opzione sotto la pastiglia
+    const cx = left + drag.w / 2; let best = null, bd = 1e9;
+    el.querySelectorAll('button').forEach(b => { const d = Math.abs(b.offsetLeft + b.offsetWidth / 2 - cx); if (d < bd) { bd = d; best = b; } });
+    el.querySelectorAll('button').forEach(b => b.classList.toggle('near', b === best));
+  });
+  const end = e => {
+    if (!drag) return; const was = drag; drag = null; el.classList.remove('dragging'); thumb.style.transition = '';
+    el.querySelectorAll('button').forEach(b => b.classList.remove('near'));
+    if (!was.moved) return;                             // era un tocco: ci pensa il click
+    const cx = parseFloat(thumb.style.left) + was.w / 2; let best = null, bd = 1e9;
+    el.querySelectorAll('button').forEach(b => { const d = Math.abs(b.offsetLeft + b.offsetWidth / 2 - cx); if (d < bd) { bd = d; best = b; } });
+    choose(best, true);
+    el._suppressClick = true; setTimeout(() => { el._suppressClick = false; }, 50);
+  };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('click', e => { if (el._suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
   requestAnimationFrame(() => place(false)); window.addEventListener('resize', () => place(false));
   setTimeout(() => place(false), 1500); setTimeout(() => place(false), 3000);
 }
