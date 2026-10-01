@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010915';
+const APP_VERSION = '202610010917';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1786,10 +1786,18 @@ function updateOrientation() {
   $('#rotate').classList.toggle('hidden', !showRotate);
   $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
   if (App.pendingStart && !showRotate && App.mode === 'solo' && !Host.started) { App.pendingStart = false; setTimeout(() => Host.startGame(), 350); }
-  if (four && portraitPhone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
 }
 window.addEventListener('resize', () => updateOrientation());
-$('#rotate-skip').onclick = () => { App.rotateSkipped = true; updateOrientation(); };
+window.addEventListener('orientationchange', () => { setTimeout(updateOrientation, 80); setTimeout(updateOrientation, 400); });
+try { matchMedia('(orientation: portrait)').addEventListener('change', () => setTimeout(updateOrientation, 50)); } catch (e) {}
+/* "Continua in verticale": reagisce al tocco (anche se iOS, dopo la rotazione, non consegna il click) */
+{
+  const skip = () => { App.rotateSkipped = true; updateOrientation(); };
+  const btn = $('#rotate-skip');
+  btn.onclick = skip;
+  btn.addEventListener('touchend', e => { e.preventDefault(); skip(); }, { passive: false });
+  btn.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') skip(); });
+}
 /* aggiornamenti: se online c'è una versione più nuova, ricarica (solo quando non si sta giocando) */
 const Updater = {
   async check(manual) {
