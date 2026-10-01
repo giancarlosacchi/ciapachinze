@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010942';
+const APP_VERSION = '202610011154';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1530,16 +1530,18 @@ const hashCode = (location.hash || '').replace('#', '').toUpperCase();
 if (hashCode && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
 if (/^[A-Z0-9]{6}$/.test(hashCode)) { $('#join-code').value = hashCode; }
 // nessun campo prende il fuoco all'apertura o al ritorno nell'app: la tastiera compare solo quando tocchi un campo
-function blurAll() { try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch (e) {} $$('input').forEach(i => { i.readOnly = true; }); }
-function armInputs() { $$('input').forEach(i => { if (!i._armed) { i._armed = true; i.readOnly = true; const unlock = () => { i.readOnly = false; }; i.addEventListener('pointerdown', unlock); i.addEventListener('touchstart', unlock, { passive: true }); i.addEventListener('mousedown', unlock); i.addEventListener('blur', () => { i.readOnly = true; }); } }); }
-new MutationObserver(() => armInputs()).observe(document.body, { childList: true, subtree: true });
-armInputs(); blurAll();
+function blurAll() { try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch (e) {} }
+/* quando un campo prende il fuoco, resta visibile sopra la tastiera */
+document.addEventListener('focusin', e => { const el = e.target; if (el && el.tagName === 'INPUT') setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {} }, 250); });
+blurAll();
 // animazione di benvenuto nella home (ogni volta che si apre l'app, una sola volta per apertura)
 (() => { const h = $('#scr-home'); h.classList.add('intro'); setTimeout(() => h.classList.remove('intro'), 2600); })();
+// niente tastiera all'apertura; ma mai togliere il fuoco a un campo che l'utente ha appena toccato
+let lastTouch = 0; document.addEventListener('pointerdown', () => { lastTouch = Date.now(); }, true); document.addEventListener('touchstart', () => { lastTouch = Date.now(); }, { capture: true, passive: true });
+const blurSoft = () => { if (Date.now() - lastTouch > 1200) blurAll(); };
 window.addEventListener('load', blurAll);
-window.addEventListener('pageshow', blurAll);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) blurAll(); });
-window.addEventListener('focus', blurAll);
+window.addEventListener('pageshow', blurSoft);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) blurSoft(); });
 
 function needName(input) { const n = myName(); if (!n) { $$('.name-field').forEach(f => f.classList.remove('hidden')); input.focus(); toast('Scrivi prima il tuo nome'); return null; } Store.set('cpz-name', n); applyName(); return n; }
 $('#btn-host').onclick = () => { const name = needName($('#host-name')); if (name) hostRoom({ players: App.cfg.players, target: App.cfg.target }, name, false); };
@@ -1806,16 +1808,19 @@ function updateOrientation() {
   if (App.pendingStart && !showRotate && App.mode === 'solo' && !Host.started) { App.pendingStart = false; setTimeout(() => Host.startGame(), 350); }
 }
 /* dopo una rotazione: riporta la finestra a zero, togli il fuoco e ridisegna il tavolo con le misure nuove */
+let lastW = window.innerWidth;
 function afterRotate() {
+  // solo per una vera rotazione (cambia la larghezza): l'apertura della tastiera cambia solo l'altezza e non deve togliere il fuoco al campo
+  const rotated = window.innerWidth !== lastW; lastW = window.innerWidth;
+  updateOrientation();
+  if (!rotated) return;
   try { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e) {}
   if (document.activeElement && document.activeElement.blur && document.activeElement.tagName !== 'BODY') document.activeElement.blur();
-  updateOrientation();
   if (App.view && !$('#game').classList.contains('hidden') && !(processing || queue.length)) { try { Stage.render(App.view); } catch (e) {} }
 }
 let rotateTimer = null;
 window.addEventListener('resize', () => { updateOrientation(); clearTimeout(rotateTimer); rotateTimer = setTimeout(afterRotate, 120); });
 window.addEventListener('orientationchange', () => { setTimeout(afterRotate, 80); setTimeout(afterRotate, 450); });
-if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { clearTimeout(rotateTimer); rotateTimer = setTimeout(afterRotate, 120); });
 try { matchMedia('(orientation: portrait)').addEventListener('change', () => setTimeout(updateOrientation, 50)); } catch (e) {}
 /* "Continua in verticale": reagisce al tocco (anche se iOS, dopo la rotazione, non consegna il click) */
 {
