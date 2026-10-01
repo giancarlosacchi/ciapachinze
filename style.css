@@ -420,7 +420,7 @@ input { font: inherit; }
 .tappa.next { border-color: var(--oro-2); box-shadow: 0 0 0 1px var(--oro-2), 0 0 24px rgba(240,199,80,.35); }
 .tappa .lock { position: absolute; top: 10px; right: 12px; font-size: 14px; }
 /* obiettivo in gioco */
-.goalbar { position: absolute; top: 10px; right: 12px; z-index: 6; }
+.goalbar { position: absolute; top: 10px; right: 12px; z-index: 65; }
 .goalbar .goalbtn { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: rgba(0,0,0,.42); color: var(--oro-2); font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0,0,0,.25); transition: transform .15s var(--spring), background .15s; }
 .goalbar .goalbtn:active { transform: scale(.92); }
 .goalbar .goalbtn .n { font-size: 11px; font-weight: 700; color: var(--avorio); opacity: .85; }
