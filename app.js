@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011239';
+const APP_VERSION = '202610011637';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -238,6 +238,7 @@ const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''
 function showScreen(id) {
   $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); if (s.id === id) s.scrollTop = 0; });
   $('#game').classList.toggle('hidden', id !== 'game'); $('#game').classList.remove('enter');
+  if (id !== 'game') setTimeout(() => { try { updateOrientation(); } catch (e) {} }, 0);
   if (showScreen.first) { showScreen.first = false; return; }
   const el = id === 'game' ? $('#game') : $('#' + id); if (el) { void el.offsetWidth; el.classList.add('enter'); }
 }
@@ -1957,6 +1958,14 @@ function updateOrientation() {
   const portraitPhone = window.innerWidth < 640 && window.innerWidth <= window.innerHeight;
   const showRotate = four && portraitPhone && !App.rotateSkipped;
   $('#rotate').classList.toggle('hidden', !showRotate);
+  // Android (app installata): chiedi l'orizzontale nel 2 contro 2 e libera l'orientamento quando si esce; iPhone ignora la richiesta e si gira a mano
+  try {
+    const so = screen.orientation;
+    if (so && so.lock) {
+      if (four && !App.rotateSkipped && !App.orientLocked) { App.orientLocked = true; so.lock('landscape').catch(() => { App.orientLocked = false; }); }
+      else if ((!four || App.rotateSkipped) && App.orientLocked) { App.orientLocked = false; so.unlock && so.unlock(); }
+    }
+  } catch (e) {}
   $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
   if (App.pendingStart && !showRotate && App.mode === 'solo' && !Host.started) { App.pendingStart = false; setTimeout(() => Host.startGame(), 350); }
 }
