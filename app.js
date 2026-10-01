@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011219';
+const APP_VERSION = '202610011235';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -473,7 +473,7 @@ async function openHostPeer(cfg, name, keep) {
   if (typeof Peer === 'undefined') { $('#lobby-status').textContent = 'Libreria di rete non caricata: controlla la connessione e riapri l\'app.'; return; }
   const peer = await makePeer('cpz-' + App.code);
   App.peer = peer;
-  peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(peer); Session.save(); WakeLock.request(); });
+  peer.on('open', () => { $('#lobby-status').textContent = ''; App.roster = Host.roster(); renderLobby(); Voice.attachPeer(peer); Session.save(); WakeLock.request(); Relay.host(); });
   peer.on('connection', conn => Host.onConnection(conn));
   peer.on('error', e => {
     if (e.type === 'unavailable-id') {
@@ -499,6 +499,89 @@ function watchPeer() {
 }
 setInterval(watchPeer, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { setTimeout(watchPeer, 300); WakeLock.request(); } });
+/* =====================================================================
+   Ponte di riserva (MQTT su WebSocket, broker pubblici): se il canale diretto fra i due telefoni non si apre
+   (reti mobili chiuse, niente TURN), i messaggi di gioco passano di qui. Sono piccoli JSON: va benissimo.
+   ===================================================================== */
+const Relay = {
+  BROKERS: ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'],
+  client: null, ready: null, url: null,
+  topic(code, ...rest) { return ['ciapachinze', 'v1', code, ...rest].join('/'); },
+  connect() {
+    if (this.ready) return this.ready;
+    this.ready = new Promise(resolve => {
+      if (typeof mqtt === 'undefined') { this.ready = null; return resolve(null); }
+      let i = 0;
+      const tryNext = () => {
+        if (i >= this.BROKERS.length) { this.ready = null; return resolve(null); }
+        const url = this.BROKERS[i++]; let settled = false;
+        let c; try { c = mqtt.connect(url, { clean: true, connectTimeout: 6000, reconnectPeriod: 2500, keepalive: 30, clientId: 'cpz_' + Math.random().toString(36).slice(2, 10) }); } catch (e) { return tryNext(); }
+        const timer = setTimeout(() => { if (!settled) { settled = true; try { c.end(true); } catch (e) {} tryNext(); } }, 7000);
+        c.once('connect', () => { if (settled) return; settled = true; clearTimeout(timer); this.client = c; this.url = url; resolve(c); });
+        c.on('error', () => {});
+        c.once('close', () => { if (!settled) { settled = true; clearTimeout(timer); try { c.end(true); } catch (e) {} tryNext(); } });
+      };
+      tryNext();
+    });
+    return this.ready;
+  },
+  /* connessione "virtuale" con la stessa forma di una DataConnection di PeerJS (on/send/close/peer/open) */
+  makeConn(client, sendTopic, peerId, wrap) {
+    const handlers = {};
+    const conn = {
+      peer: peerId, open: true, relay: true,
+      on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); },
+      emit(ev, ...a) { (handlers[ev] || []).forEach(f => { try { f(...a); } catch (e) { console.error(e); } }); },
+      send(msg) { try { client.publish(sendTopic, JSON.stringify(wrap ? wrap(msg) : msg), { qos: 0 }); } catch (e) {} },
+      close() { conn.open = false; conn.emit('close'); },
+    };
+    return conn;
+  },
+  /* lato tavolo: ascolta gli ospiti che arrivano dal ponte */
+  async host() {
+    const code = App.code; if (!code || App.mode !== 'host') return;
+    const c = await this.connect(); if (!c || App.mode !== 'host' || App.code !== code) return;
+    const inTopic = this.topic(code, 'h');
+    if (this.hostTopic === inTopic) return;
+    if (this.hostTopic) { try { c.unsubscribe(this.hostTopic); } catch (e) {} }
+    this.hostTopic = inTopic; this.hostConns = new Map();
+    c.subscribe(inTopic, { qos: 0 });
+    if (!this.hostBound) {
+      this.hostBound = true;
+      c.on('message', (topic, payload) => {
+        if (topic !== this.hostTopic || App.mode !== 'host') return;
+        let env; try { env = JSON.parse(payload.toString()); } catch (e) { return; }
+        if (!env || !env.from || !env.msg) return;
+        let conn = this.hostConns.get(env.from);
+        if (!conn) { conn = this.makeConn(c, this.topic(App.code, 'g', env.from), env.from); this.hostConns.set(env.from, conn); Host.onConnection(conn); }
+        conn.emit('data', env.msg);
+      });
+    }
+  },
+  /* lato ospite: si presenta al tavolo attraverso il ponte; risolve con la connessione quando arriva il "welcome" */
+  async guest(code, name, isJoined, onData) {
+    const c = await this.connect(); if (!c || isJoined()) return null;
+    const myId = (App.peer && App.peer.id) || ('r' + token);
+    const inTopic = this.topic(code, 'g', myId);
+    c.subscribe(inTopic, { qos: 0 });
+    const conn = this.makeConn(c, this.topic(code, 'h'), 'host', msg => ({ from: myId, msg }));
+    c.on('message', (topic, payload) => { if (topic !== inTopic) return; let msg; try { msg = JSON.parse(payload.toString()); } catch (e) { return; } conn.emit('data', msg); });
+    return new Promise(resolve => {
+      let hello = 0, accepted = false, dead = false;
+      conn.on('data', msg => {
+        if (dead) return;
+        if (!accepted) { if (msg.t !== 'welcome' || isJoined()) return; accepted = true; clearInterval(timer); resolve(conn); }
+        onData(msg);
+      });
+      const timer = setInterval(() => {
+        if (accepted) return;
+        if (isJoined() || hello > 20) { clearInterval(timer); dead = true; try { c.unsubscribe(inTopic); } catch (e) {} resolve(null); return; }
+        hello++; conn.send({ t: 'hello', name, token });
+      }, 2500);
+      conn.send({ t: 'hello', name, token }); hello++;
+    });
+  },
+};
 /* schermo acceso mentre il tavolo è aperto: se il telefono si blocca, la connessione con gli amici cade */
 const WakeLock = {
   lock: null,
@@ -528,14 +611,25 @@ async function joinRoom(code, name) {
     done();
   });
   App.peer.on('disconnected', () => { try { App.peer.reconnect(); } catch (e) {} });
-  let tries = 0;
+  let tries = 0, relayTried = false;
   function connectToHost() {
-    const conn = App.peer.connect('cpz-' + code, { reliable: true, metadata: { name } });
+    const conn = window.__forceRelay ? { open: false, on() {}, close() {} } : App.peer.connect('cpz-' + code, { reliable: true, metadata: { name } });
     App.hostConn = conn;
     // 2) il canale diretto con il tavolo: può volerci qualche secondo in più su rete mobile, quindi si aspetta senza interrompere
     const t2 = setTimeout(() => { if (!joined && !conn.open) st.textContent = 'Sto ancora cercando di raggiungere il tavolo…'; }, 8000);
+    if (!relayTried) {
+      relayTried = true;
+      setTimeout(async () => {
+        if (joined) return;
+        const rc = await Relay.guest(code, name, () => joined, msg => Client.receive(msg));
+        if (!rc || joined) return;
+        joined = true; App.hostConn = rc; st.textContent = ''; done(); WakeLock.request();
+        try { conn.close(); } catch (e) {}
+        $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save();
+      }, window.__forceRelay ? 0 : 5000);
+    }
     const t3 = setTimeout(() => { if (!joined && !conn.open) { st.textContent = 'Il tavolo tarda a rispondere: il tuo amico deve tenere il tavolo aperto sullo schermo. Continuo a provare…'; done(); } }, 25000);
-    conn.on('open', () => { joined = true; clearTimeout(t2); clearTimeout(t3); tries = 0; App.hostConn = conn; st.textContent = ''; done(); WakeLock.request(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
+    conn.on('open', () => { clearTimeout(t2); clearTimeout(t3); if (joined) { try { conn.close(); } catch (e) {} return; } joined = true; tries = 0; App.hostConn = conn; st.textContent = ''; done(); WakeLock.request(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
     conn.on('data', msg => Client.receive(msg));
     conn.on('close', () => { clearTimeout(t2); clearTimeout(t3); if (App.hostConn !== conn) return; if (joined) toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else { st.textContent = 'Impossibile collegarsi: riapri il link del tavolo.'; toast('Impossibile ricollegarsi: riapri il link del tavolo'); done(); } });
     conn.on('error', () => {});
@@ -1909,5 +2003,5 @@ const Updater = {
 setTimeout(() => Updater.check(false), 4000);
 // service worker: la pagina e i file si prendono sempre dalla rete quando c'è, dalla copia locale quando non c'è
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
-window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, iceConfig, hostRoom, joinRoom, busy: () => processing || queue.length > 0 };
+window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, Sound, iceConfig, hostRoom, joinRoom, Relay, busy: () => processing || queue.length > 0 };
 })();
