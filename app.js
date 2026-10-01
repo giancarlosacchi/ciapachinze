@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011217';
+const APP_VERSION = '202610011219';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -532,15 +532,12 @@ async function joinRoom(code, name) {
   function connectToHost() {
     const conn = App.peer.connect('cpz-' + code, { reliable: true, metadata: { name } });
     App.hostConn = conn;
-    // 2) il canale diretto con il tavolo deve aprirsi (qui entra in gioco il TURN se le reti sono chiuse)
-    const t2 = setTimeout(() => {
-      if (joined || conn.open) return;
-      if (tries++ < 2) { st.textContent = 'Il tavolo non risponde, riprovo…'; try { conn.close(); } catch (e) {} connectToHost(); }
-      else { st.textContent = 'Non riesco a raggiungere il tavolo. Il tuo amico deve tenere il tavolo aperto sullo schermo; se siete su reti diverse provate entrambi con il Wi‑Fi, poi riprova.'; done(); }
-    }, 12000);
-    conn.on('open', () => { joined = true; clearTimeout(t2); tries = 0; st.textContent = ''; done(); WakeLock.request(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
+    // 2) il canale diretto con il tavolo: può volerci qualche secondo in più su rete mobile, quindi si aspetta senza interrompere
+    const t2 = setTimeout(() => { if (!joined && !conn.open) st.textContent = 'Sto ancora cercando di raggiungere il tavolo…'; }, 8000);
+    const t3 = setTimeout(() => { if (!joined && !conn.open) { st.textContent = 'Il tavolo tarda a rispondere: il tuo amico deve tenere il tavolo aperto sullo schermo. Continuo a provare…'; done(); } }, 25000);
+    conn.on('open', () => { joined = true; clearTimeout(t2); clearTimeout(t3); tries = 0; App.hostConn = conn; st.textContent = ''; done(); WakeLock.request(); conn.send({ t: 'hello', name, token }); $('#lobby-code').textContent = code; history.replaceState(null, '', '#' + code); Session.save(); });
     conn.on('data', msg => Client.receive(msg));
-    conn.on('close', () => { clearTimeout(t2); if (!joined) return; toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else toast('Impossibile ricollegarsi: riapri il link del tavolo'); });
+    conn.on('close', () => { clearTimeout(t2); clearTimeout(t3); if (App.hostConn !== conn) return; if (joined) toast('Connessione persa, riprovo…'); if (tries++ < 20) setTimeout(connectToHost, 1500 + tries * 500); else { st.textContent = 'Impossibile collegarsi: riapri il link del tavolo.'; toast('Impossibile ricollegarsi: riapri il link del tavolo'); done(); } });
     conn.on('error', () => {});
   }
 }
