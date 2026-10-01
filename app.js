@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011643';
+const APP_VERSION = '202610011655';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -422,7 +422,7 @@ const Client = {
   },
   receive(msg) {
     switch (msg.t) {
-      case 'welcome': App.mySeat = msg.seat; App.cfg = msg.cfg; App.code = msg.code; App.rotateSkipped = false; updateOrientation(); break;
+      case 'welcome': App.mySeat = msg.seat; App.cfg = msg.cfg; if (App.code !== msg.code) App.rotateSkipped = false; App.code = msg.code; updateOrientation(); break;
       case 'lobby': App.roster = msg.roster; App.cfg = msg.cfg; if (!msg.started) { showScreen('scr-lobby'); renderLobby(); } else renderPlayers(); Voice.rosterChanged(); break;
       case 'view': onView(msg.view, msg.roster); break;
       case 'err': toast(msg.msg); Stage.locked = false; Stage.clearSelection(); if (App.view) Stage.render(App.view); break;
@@ -571,7 +571,12 @@ const Relay = {
       let hello = 0, accepted = false, dead = false;
       conn.on('data', msg => {
         if (dead) return;
-        if (!accepted) { if (msg.t !== 'welcome' || isJoined()) return; accepted = true; clearInterval(timer); resolve(conn); }
+        if (!accepted) {
+          if (msg.t !== 'welcome') return;
+          // il tavolo ha risposto sul ponte ma nel frattempo si era aperto il canale diretto: ripresentati sul diretto, così il tavolo torna a usare quello
+          if (isJoined()) { try { if (App.hostConn && App.hostConn !== conn && App.hostConn.open) App.hostConn.send({ t: 'hello', name, token }); } catch (e) {} return; }
+          accepted = true; clearInterval(timer); resolve(conn);
+        }
         onData(msg);
       });
       const timer = setInterval(() => {
@@ -590,7 +595,7 @@ const WakeLock = {
   release() { try { if (this.lock) this.lock.release(); } catch (e) {} this.lock = null; },
 };
 async function joinRoom(code, name) {
-  App.mode = 'guest'; App.myName = name; App.code = code;
+  App.mode = 'guest'; App.myName = name; App.code = code; App.rotateSkipped = false;
   const st = $('#join-status'); st.textContent = 'Mi collego al tavolo…';
   const btn = $('#btn-join'); if (btn) btn.disabled = true;
   const done = () => { if (btn) btn.disabled = false; };
