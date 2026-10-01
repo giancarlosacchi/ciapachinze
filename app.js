@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011637';
+const APP_VERSION = '202610011643';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1962,8 +1962,8 @@ function updateOrientation() {
   try {
     const so = screen.orientation;
     if (so && so.lock) {
-      if (four && !App.rotateSkipped && !App.orientLocked) { App.orientLocked = true; so.lock('landscape').catch(() => { App.orientLocked = false; }); }
-      else if ((!four || App.rotateSkipped) && App.orientLocked) { App.orientLocked = false; so.unlock && so.unlock(); }
+      if (four && !App.rotateSkipped && !App.orientLocked && !App.orientTried) { App.orientTried = true; so.lock('landscape').then(() => { App.orientLocked = true; }).catch(() => {}); }
+      else if (!four || App.rotateSkipped) { App.orientTried = false; if (App.orientLocked) releaseOrientation(); }
     }
   } catch (e) {}
   $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
@@ -1984,9 +1984,26 @@ let rotateTimer = null;
 window.addEventListener('resize', () => { updateOrientation(); clearTimeout(rotateTimer); rotateTimer = setTimeout(afterRotate, 120); });
 window.addEventListener('orientationchange', () => { setTimeout(afterRotate, 80); setTimeout(afterRotate, 450); });
 try { matchMedia('(orientation: portrait)').addEventListener('change', () => setTimeout(updateOrientation, 50)); } catch (e) {}
+/* "Gira in orizzontale": su Android funziona anche con la rotazione automatica spenta, ma serve un tocco (e, nel browser, lo schermo intero) */
+async function forceLandscape() {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  try { if (!standalone && !document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); } catch (e) {}
+  try { await screen.orientation.lock('landscape'); App.orientLocked = true; }
+  catch (e) { toast('Il telefono non permette di ruotare da qui: attiva la rotazione automatica nelle impostazioni rapide e gira il telefono'); }
+}
+function releaseOrientation() {
+  try { if (App.orientLocked && screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  App.orientLocked = false;
+  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
+}
+{
+  const auto = $('#rotate-auto');
+  auto.onclick = () => forceLandscape();
+  auto.addEventListener('touchend', e => { e.preventDefault(); forceLandscape(); }, { passive: false });
+}
 /* "Continua in verticale": reagisce al tocco (anche se iOS, dopo la rotazione, non consegna il click) */
 {
-  const skip = () => { App.rotateSkipped = true; updateOrientation(); };
+  const skip = () => { App.rotateSkipped = true; releaseOrientation(); updateOrientation(); };
   const btn = $('#rotate-skip');
   btn.onclick = skip;
   btn.addEventListener('touchend', e => { e.preventDefault(); skip(); }, { passive: false });

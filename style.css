@@ -862,3 +862,6 @@ html.theme-memphis .chooser .ch-opt:hover { background: #ffd23f; }
 html.theme-memphis .stars-brief { background: #fff; border: 2px solid #1b1a24; box-shadow: 3px 3px 0 #1b1a24; }
 html.theme-memphis .stars-brief > div { color: #1b1a24; border-top-color: rgba(27,26,36,.15); }
 html.theme-memphis .stars-brief > div > span:first-child { color: #e63946; }
+
+.rotate .rotate-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; justify-content: center; }
+.rotate #rotate-skip { margin-top: 0; }
