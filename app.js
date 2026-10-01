@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010840';
+const APP_VERSION = '202610010842';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1707,14 +1707,18 @@ const Updater = {
       const r = await fetch(location.pathname.replace(/[^/]*$/, '') + 'index.html?nocache=' + Date.now(), { cache: 'no-store' });
       const txt = await r.text(); const m = txt.match(/app\.js\?v=(\d+)/); const latest = m ? m[1] : null;
       if (latest && latest !== APP_VERSION) {
-        if (!App.view || App.view.phase !== 'play') { toast('Nuova versione: aggiorno…'); setTimeout(() => location.reload(), 900); }
-        else if (manual) toast('C\'è una nuova versione: la scarico a fine partita');
-        else this.pending = true;
+        // mai ricaricare da soli: si avvisa e si lascia scegliere
+        if (this.shown) return; this.shown = true;
+        const t = document.createElement('div'); t.className = 'toast update'; t.innerHTML = `Nuova versione disponibile <button class="btn sm oro" id="upd-go">Aggiorna</button>`;
+        $('#toasts').appendChild(t);
+        t.querySelector('#upd-go').onclick = () => { location.reload(); };
+        setTimeout(() => t.remove(), 12000);
       } else if (manual) toast('Hai già l\'ultima versione');
     } catch (e) { if (manual) toast('Non riesco a controllare adesso'); }
   },
 };
-setTimeout(() => Updater.check(false), 1500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) Updater.check(false); });
+setTimeout(() => Updater.check(false), 4000);
+// service worker: la pagina e i file si prendono sempre dalla rete quando c'è, dalla copia locale quando non c'è
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
 window.__cpz = { App, Host, Client, Stage, Voice, C, ArcadeUI, Store, busy: () => processing || queue.length > 0 };
 })();

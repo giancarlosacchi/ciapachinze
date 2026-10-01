@@ -741,3 +741,5 @@ html:not(.theme-memphis) #scr-home .field:focus-within label { color: #fff; }
 /* arcade: barra che cresce con molla */
 .arcade-progress .bar i { transition: width .9s var(--spring); }
 @media (prefers-reduced-motion: reduce) { .screen, #game:not(.hidden), .modal, .ripple { animation: none !important; } html:not(.theme-memphis) #scr-home .seg .thumb { transition: none; } }
+
+.toast.update { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; }
