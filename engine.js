@@ -96,10 +96,10 @@
       return out;
     }
 
-    const singles = [];
-    vals.forEach((v, i) => { if (v === val) singles.push(i); });
-    if (singles.length) singles.forEach(i => push([i], 'simple'));
-    else subsetsWithSum(vals, val).forEach(s => push(s, 'simple'));
+    // presa semplice: carta uguale oppure somma di più carte. Si offrono tutte le combinazioni valide
+    // e il giocatore sceglie (es. con un Re in mano e in tavola Re, Re, 6, 4: uno dei due Re o 6+4).
+    vals.forEach((v, i) => { if (v === val) push([i], 'simple'); });
+    subsetsWithSum(vals, val).forEach(s => push(s, 'simple'));
     if (15 - val >= 1) subsetsWithSum(vals, 15 - val).forEach(s => push(s, 'fifteen'));
     return out;
   }

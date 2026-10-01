@@ -10,13 +10,14 @@ const keys = opts => opts.map(o => o.idx.join(',')).sort();
 // --- prese semplici ---
 eq(keys(C.captureOptions(T(['S7']), 7)), ['0'], '7 prende 7');
 eq(keys(C.captureOptions(T(['S2', 'C5']), 7)), ['0,1'], '7 prende 2+5');
-eq(keys(C.captureOptions(T(['S2', 'C5', 'D7']), 7)), ['2'], 'obbligo carta uguale: 7 prende solo il 7');
-eq(keys(C.captureOptions(T(['S2', 'C5', 'D7', 'H1']), 7)), ['0,1,3', '2', '2,3'], '7: presa singola + prese da 15 (2+5+1, 7+1)');
+eq(keys(C.captureOptions(T(['S2', 'C5', 'D7']), 7)), ['0,1', '2'], '7: può prendere il 7 oppure 2+5');
+eq(keys(C.captureOptions(T(['S2', 'C5', 'D7', 'H1']), 7)), ['0,1', '0,1,3', '2', '2,3'], '7: 2+5, 7, e prese da 15 (2+5+1, 7+1)');
 eq(keys(C.captureOptions(T(['S3']), 7)), [], 'nessuna presa');
 // --- presa da 15 ---
 eq(keys(C.captureOptions(T(['S5']), 10)), ['0'], 'K + 5 = 15');
 eq(keys(C.captureOptions(T(['S3', 'C4']), 8)), ['0,1'], 'J + 3 + 4 = 15');
 eq(keys(C.captureOptions(T(['S8', 'C4', 'D3']), 8)), ['0', '1,2'], 'J: presa singola J oppure 15 con 4+3');
+eq(keys(C.captureOptions(T(['S10', 'C10', 'D6', 'H4']), 10)), ['0', '1', '2,3'], 'K con K, K, 6, 4: scegli uno dei due Re o 6+4');
 // --- asso ---
 eq(C.captureOptions(T(['S8', 'C4', 'D3']), 1), [{ idx: [0, 1, 2], kind: 'ace', scopa: true }], 'asso piglia tutto');
 eq(keys(C.captureOptions(T(['S8', 'C4', 'D1']), 1)), ['2'], 'asso con asso in tavola: solo l\'asso');
