@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011655';
+const APP_VERSION = '202610011709';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -238,7 +238,7 @@ const genCode = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''
 function showScreen(id) {
   $$('.screen').forEach(s => { s.classList.toggle('off', s.id !== id); s.classList.remove('enter'); if (s.id === id) s.scrollTop = 0; });
   $('#game').classList.toggle('hidden', id !== 'game'); $('#game').classList.remove('enter');
-  if (id !== 'game') setTimeout(() => { try { updateOrientation(); } catch (e) {} }, 0);
+  if (id !== 'game') setTimeout(() => { try { updateOrientation(); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch (e) {} }, 0);
   if (showScreen.first) { showScreen.first = false; return; }
   const el = id === 'game' ? $('#game') : $('#' + id); if (el) { void el.offsetWidth; el.classList.add('enter'); }
 }
@@ -2002,10 +2002,21 @@ function releaseOrientation() {
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
 }
 {
-  const auto = $('#rotate-auto');
+  const auto = $('#rotate-auto'), ov = $('#rotate');
   auto.onclick = () => forceLandscape();
   auto.addEventListener('touchend', e => { e.preventDefault(); forceLandscape(); }, { passive: false });
+  // anche un tocco sul resto dell'avviso (non sui bottoni) prova a girare lo schermo
+  ov.addEventListener('click', e => { if (!e.target.closest('button')) forceLandscape(); });
 }
+/* in orizzontale, nel browser (non nell'app installata, già a tutto schermo): al primo tocco sul tavolo si passa a schermo intero per avere più spazio */
+function maybeFullscreen() {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (standalone || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  if (!$('#game').classList.contains('landscape')) return;
+  try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch (e) {}
+}
+$('#game').addEventListener('pointerup', maybeFullscreen, true);
+$('#game').addEventListener('touchend', maybeFullscreen, true);
 /* "Continua in verticale": reagisce al tocco (anche se iOS, dopo la rotazione, non consegna il click) */
 {
   const skip = () => { App.rotateSkipped = true; releaseOrientation(); updateOrientation(); };
