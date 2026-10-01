@@ -25,7 +25,9 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* il documento non scorre mai (scorrono solo le schermate): così, su iPhone, dopo una rotazione la pagina non resta "spostata" e i tocchi cadono dove si vede */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow: hidden; }
+body { position: fixed; inset: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   font-family: var(--font-body);
   color: var(--testo);
