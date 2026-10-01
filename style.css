@@ -516,7 +516,8 @@ html.theme-memphis #scr-home::before, #scr-home::after { display: none; }
 html.theme-memphis #scr-home::before { width: 260px; height: 260px; left: -90px; top: 18%; background: radial-gradient(circle, var(--mem-teal) 0 48%, transparent 49%), radial-gradient(circle, var(--mem-ink) 2px, transparent 2.5px); background-size: 100% 100%, 14px 14px; opacity: .9; }
 html.theme-memphis #scr-home::after { width: 180px; height: 180px; right: -60px; bottom: 12%; background: repeating-linear-gradient(135deg, var(--mem-yellow) 0 10px, var(--mem-ink) 10px 13px); border: 4px solid var(--mem-ink); border-radius: 30% 70% 60% 40%; transform: rotate(12deg); }
 html.theme-memphis #scr-home .home { position: relative; z-index: 1; }
-html.theme-memphis #scr-home .memphis { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+#scr-home .memphis { display: none; }
+html.theme-memphis #scr-home .memphis { display: block; position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 html.theme-memphis #scr-home .memphis svg { position: absolute; }
 html.theme-memphis #scr-home .wordmark { color: var(--mem-ink); text-shadow: 4px 4px 0 var(--mem-yellow); }
 html.theme-memphis #scr-home .wordmark.big { font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144; }
