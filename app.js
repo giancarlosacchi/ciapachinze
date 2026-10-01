@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010750';
+const APP_VERSION = '202610010753';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -379,7 +379,7 @@ const Client = {
   },
   receive(msg) {
     switch (msg.t) {
-      case 'welcome': App.mySeat = msg.seat; App.cfg = msg.cfg; App.code = msg.code; break;
+      case 'welcome': App.mySeat = msg.seat; App.cfg = msg.cfg; App.code = msg.code; App.rotateSkipped = false; updateOrientation(); break;
       case 'lobby': App.roster = msg.roster; App.cfg = msg.cfg; if (!msg.started) { showScreen('scr-lobby'); renderLobby(); } else renderPlayers(); Voice.rosterChanged(); break;
       case 'view': onView(msg.view, msg.roster); break;
       case 'err': toast(msg.msg); Stage.locked = false; Stage.clearSelection(); if (App.view) Stage.render(App.view); break;
@@ -409,7 +409,7 @@ const Session = {
   clear() { try { localStorage.removeItem('cpz-session'); } catch (e) {} },
 };
 async function hostRoom(cfg, name, solo, reuseCode) {
-  App.mode = solo ? 'solo' : 'host'; App.myName = name; App.mySeat = 0; App.cfg = cfg;
+  App.mode = solo ? 'solo' : 'host'; App.myName = name; App.mySeat = 0; App.cfg = cfg; App.rotateSkipped = false; setTimeout(updateOrientation, 0);
   Host.init(cfg, name, solo);
   if (solo) { App.code = 'LOCALE'; App.roster = Host.roster(); Host.startGame(); return; }
   App.code = reuseCode || genCode();
@@ -1625,13 +1625,14 @@ ArcadeUI.homeProgress();
 Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); } Store.mirror(); });
 /* 2 vs 2 sul telefono: si gioca in orizzontale */
 function updateOrientation() {
-  const four = App.view && App.view.cfg.players === 4;
+  const four = (App.view && App.view.cfg.players === 4) || (!App.view && App.cfg && App.cfg.players === 4 && (App.mode === 'host' || App.mode === 'guest' || App.mode === 'solo'));
   const portraitPhone = window.innerWidth < 640 && window.innerWidth <= window.innerHeight;
-  $('#rotate').classList.toggle('hidden', !(four && portraitPhone));
+  $('#rotate').classList.toggle('hidden', !(four && portraitPhone) || App.rotateSkipped);
   $('#game').classList.toggle('landscape', !!(four && !portraitPhone && window.innerHeight < 520));
   if (four && portraitPhone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
 }
-window.addEventListener('resize', () => { if (App.view) updateOrientation(); });
+window.addEventListener('resize', () => updateOrientation());
+$('#rotate-skip').onclick = () => { App.rotateSkipped = true; updateOrientation(); };
 /* aggiornamenti: se online c'è una versione più nuova, ricarica (solo quando non si sta giocando) */
 const Updater = {
   async check(manual) {

@@ -462,8 +462,9 @@ input { font: inherit; }
 @media (max-width: 520px) { .fx { --fs: 36px; } .fx small { font-size: 13px; } .fx .pill { padding: 10px 22px 12px; } .fx .rays { width: 380px; height: 380px; } }
 @media (prefers-reduced-motion: reduce) { .fx, .fx *, .fx::before, .fx::after { animation-duration: .01s !important; } }
 /* ===== 2 vs 2 in orizzontale ===== */
-.rotate { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; text-align: center; background: var(--ardesia); color: var(--avorio); font-family: var(--font-display); font-size: 22px; padding: 24px; }
+.rotate { position: fixed; inset: 0; z-index: 48; display: grid; place-items: center; text-align: center; background: var(--ardesia); color: var(--avorio); font-family: var(--font-display); font-size: 22px; padding: 24px; }
 .rotate small { display: block; font-family: var(--font-body); font-size: 14px; color: var(--testo-2); margin-top: 6px; }
+.rotate #rotate-skip { margin-top: 18px; font-size: 13px; }
 .rotate .phone { width: 46px; height: 84px; border: 3px solid var(--avorio); border-radius: 10px; margin-bottom: 18px; animation: rotatephone 1.8s ease-in-out infinite; position: relative; }
 .rotate .phone::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 10px; height: 3px; border-radius: 2px; background: var(--avorio); transform: translateX(-50%); }
 @keyframes rotatephone { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
