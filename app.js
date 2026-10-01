@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610010753';
+const APP_VERSION = '202610010806';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1415,6 +1415,8 @@ function blurAll() { try { if (document.activeElement && document.activeElement 
 function armInputs() { $$('input').forEach(i => { if (!i._armed) { i._armed = true; i.readOnly = true; const unlock = () => { i.readOnly = false; }; i.addEventListener('pointerdown', unlock); i.addEventListener('touchstart', unlock, { passive: true }); i.addEventListener('mousedown', unlock); i.addEventListener('blur', () => { i.readOnly = true; }); } }); }
 new MutationObserver(() => armInputs()).observe(document.body, { childList: true, subtree: true });
 armInputs(); blurAll();
+// animazione di benvenuto nella home (ogni volta che si apre l'app, una sola volta per apertura)
+(() => { const h = $('#scr-home'); h.classList.add('intro'); setTimeout(() => h.classList.remove('intro'), 2600); })();
 window.addEventListener('load', blurAll);
 window.addEventListener('pageshow', blurAll);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) blurAll(); });

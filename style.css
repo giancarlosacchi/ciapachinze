@@ -487,3 +487,18 @@ input { font: inherit; }
   .modal h2 { font-size: 20px; margin-bottom: 2px; }
   .tbl th, .tbl td { padding: 3px 6px; font-size: 13px; }
 }
+
+/* ===== apertura della home: le carte entrano una alla volta ===== */
+#scr-home.intro .wordmark.big { animation: introLogo .9s var(--ease) both; }
+#scr-home.intro .tag, #scr-home.intro .hello { animation: introFade .7s ease both; animation-delay: .35s; }
+#scr-home.intro .home-cards .panel { animation: introCard .85s cubic-bezier(.2,.9,.25,1.15) both; transform-origin: 50% 110%; }
+#scr-home.intro .home-cards .panel:nth-child(1) { animation-delay: .45s; }
+#scr-home.intro .home-cards .panel:nth-child(2) { animation-delay: .62s; }
+#scr-home.intro .home-cards .panel:nth-child(3) { animation-delay: .79s; }
+#scr-home.intro .home-foot { animation: introFade .6s ease both; animation-delay: 1.1s; }
+#scr-home.intro .badge { animation: introBadge 1s cubic-bezier(.2,.9,.3,1.3) both; animation-delay: .5s; }
+@keyframes introLogo { 0% { opacity: 0; transform: translateY(18px) scale(.92); letter-spacing: .08em; } 100% { opacity: 1; transform: none; letter-spacing: -.035em; } }
+@keyframes introFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes introCard { 0% { opacity: 0; transform: translateY(70px) rotate(-6deg) scale(.86); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes introBadge { 0% { opacity: 0; transform: rotate(-40deg) translateY(-30px) scale(.4); } 100% { opacity: 1; transform: rotate(9deg) translateY(-.08em) scale(1); } }
+@media (prefers-reduced-motion: reduce) { #scr-home.intro * { animation: none !important; } }
