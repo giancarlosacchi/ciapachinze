@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610011718';
+const APP_VERSION = '202610021615';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1732,6 +1732,7 @@ function openSettings() {
       'modalità: ' + ((window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) || navigator.standalone ? 'app installata' : 'browser') + (document.fullscreenElement ? ' (schermo intero)' : ''),
       'finestra: ' + window.innerWidth + '×' + window.innerHeight + ' · schermo: ' + screen.width + '×' + screen.height,
       'orientamento: ' + (so.type || '?') + ' (' + (so.angle != null ? so.angle + '°' : '?') + ') · blocco: ' + (so.lock ? 'disponibile' : 'no'),
+      'salvataggi: ' + (Store.persistent === true ? 'protetti' : Store.persistent === false ? 'non protetti (il sistema può cancellarli)' : '?') + ' · arcade: ' + ((Store.get('cpz-arcade') || '').length) + ' byte',
       'browser: ' + navigator.userAgent,
     ].join('\n');
     (navigator.clipboard ? navigator.clipboard.writeText(d.textContent) : Promise.reject()).then(() => toast('Diagnostica copiata'), () => {});
@@ -1795,7 +1796,7 @@ Voice.ui();
    ===================================================================== */
 const ArcadeUI = {
   prog: null, stage: null, dealsPlayed: 0, goalDone: false, bonusDone: false, mode: 'solo',
-  open() { this.prog = Arcade.load(); this.renderMap(); showScreen('scr-arcade'); },
+  open() { const go = () => { this.prog = Arcade.load(); this.renderMap(); showScreen('scr-arcade'); }; if (Store.ready && !Store.readyDone) Store.ready.then(() => { Store.readyDone = true; go(); }); else go(); },
   setMode(m) { this.mode = m; this.renderMap(); },
   homeProgress() {
     const p = Arcade.load(); const done = p.stats.stagesDone, tot = Arcade.STAGES.length, stars = Arcade.totalStars(p);
@@ -1969,7 +1970,9 @@ $('#btn-achievements').onclick = () => {
 };
 ArcadeUI.homeProgress();
 applyTheme();
-Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); applyTheme(); } Store.mirror(); });
+Store.ready = Store.restore().then(changed => { if (changed) { applyName(); ArcadeUI.homeProgress(); applyTheme(); } Store.mirror(); return changed; }).catch(() => false);
+/* chiedi al browser di non cancellare mai i salvataggi per fare spazio (Chrome/Firefox; su iPhone vale per l'app installata) */
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { Store.persistent = ok; }).catch(() => {}); } catch (e) {}
 /* 2 vs 2 sul telefono: si gioca in orizzontale */
 function updateOrientation() {
   const four = (App.view && App.view.cfg.players === 4) || (!App.view && App.cfg && App.cfg.players === 4 && (App.mode === 'host' || App.mode === 'guest' || App.mode === 'solo'));
