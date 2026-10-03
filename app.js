@@ -1,7 +1,7 @@
 /* Ciapachinze — interfaccia, rete P2P e voce */
 (() => {
 'use strict';
-const APP_VERSION = '202610021615';
+const APP_VERSION = '202610031921';
 const C = Cirulla;
 const root_Arcade = () => (typeof Arcade !== 'undefined' ? Arcade : null);
 const $ = s => document.querySelector(s);
@@ -1403,21 +1403,26 @@ function showDealEnd(view) {
   }
   showDealEndTable(view, d, false);
 }
-function showDealEndTable(view, d, arcadeContinue) {
+/* tabella del punteggio di una smazzata (riusata nel riepilogo di tappa arcade) */
+function dealTableHTML(view, d) {
   const my = C.teamOf(view, App.mySeat), ot = 1 - my;
   const names = t => view.cfg.players === 4 ? view.teams[t].map(s => view.names[s]).join(' & ') : view.names[view.teams[t][0]];
   const rows = [['Carte', 'carte', t => `${d.teams[t].nCarte}`], ['Denari ♦', 'denari', t => `${d.teams[t].nDenari}`], ['Settebello', 'settebello', () => ''], ['Primiera', 'primiera', t => `${d.teams[t].primieraVal}`], ['Scope e buone', 'scope', () => ''], ['Grande', 'grande', () => ''], ['Piccola', 'piccola', () => '']];
   const cell = (t, key, sub) => { const v = d.teams[t][key]; return `<td><span class="${v ? 'pt' : 'zero'}">${v ? '+' + v : '–'}</span>${sub(t) ? `<div style="font-size:11px;color:var(--testo-2)">${sub(t)}</div>` : ''}</td>`; };
+  const buone = d.buone.length ? `<p style="font-size:13px">${d.buone.map(b => `${esc(view.names[b.seat])}: ${b.type === 'decino' ? 'decino' : b.type === 'grande' ? 'grande in mano' : 'buona da tre'} (+${b.points})`).join(' · ')}</p>` : '';
+  return `<table class="tbl"><tr><th></th><th>${esc(names(my))}</th><th>${esc(names(ot))}</th></tr>
+    ${rows.map(([lbl, key, sub]) => `<tr><td>${lbl}</td>${cell(my, key, sub)}${cell(ot, key, sub)}</tr>`).join('')}
+    <tr class="tot"><td>Questa smazzata</td><td>+${d.teams[my].total}</td><td>+${d.teams[ot].total}</td></tr>
+    <tr class="tot"><td>Totale</td><td>${d.after[my]}</td><td>${d.after[ot]}</td></tr></table>${buone}`;
+}
+function showDealEndTable(view, d, arcadeContinue) {
+  const my = C.teamOf(view, App.mySeat), ot = 1 - my;
+  const names = t => view.cfg.players === 4 ? view.teams[t].map(s => view.names[s]).join(' & ') : view.names[view.teams[t][0]];
   const gameOver = view.phase === 'gameEnd';
   const iWon = view.winner === my;
   let title = gameOver ? (iWon ? 'Partita vinta!' : 'Partita persa') : `Smazzata ${d.dealNo}`;
   let sub = gameOver ? (d.cappotto != null ? 'Cappotto: tutti i denari in una mano!' : `${names(view.winner)} ${view.cfg.players === 4 ? 'vincono' : 'vince'} ${view.scores[view.winner]} a ${view.scores[1 - view.winner]}`) : (d.teams[my].total > d.teams[ot].total ? 'Smazzata a tuo favore' : d.teams[my].total < d.teams[ot].total ? 'Smazzata agli avversari' : 'Smazzata in parità');
-  const buone = d.buone.length ? `<p style="font-size:13px">${d.buone.map(b => `${esc(view.names[b.seat])}: ${b.type === 'decino' ? 'decino' : b.type === 'grande' ? 'grande in mano' : 'buona da tre'} (+${b.points})`).join(' · ')}</p>` : '';
-  const html = `<h2>${title}<small>${esc(sub)}</small></h2>
-    <table class="tbl"><tr><th></th><th>${esc(names(my))}</th><th>${esc(names(ot))}</th></tr>
-    ${rows.map(([lbl, key, sub]) => `<tr><td>${lbl}</td>${cell(my, key, sub)}${cell(ot, key, sub)}</tr>`).join('')}
-    <tr class="tot"><td>Questa smazzata</td><td>+${d.teams[my].total}</td><td>+${d.teams[ot].total}</td></tr>
-    <tr class="tot"><td>Totale</td><td>${d.after[my]}</td><td>${d.after[ot]}</td></tr></table>${buone}
+  const html = `<h2>${title}<small>${esc(sub)}</small></h2>${dealTableHTML(view, d)}
     <div class="actions"><button class="btn ghost" id="end-prese">Vedi le carte prese</button>
     ${gameOver ? `<button class="btn" id="end-again">Nuova partita</button>` : `<button class="btn" id="end-next">${App.mode === 'guest' ? 'Pronto per la prossima' : 'Prossima smazzata'}</button>`}</div>`;
   const m = modal(html, { closable: false }); m.id = 'end-modal';
@@ -1852,7 +1857,7 @@ const ArcadeUI = {
     m.querySelector('#stage-go').onclick = () => { m.remove(); this.mode === 'coop' ? this.startCoop(st) : this.start(st); };
   },
   start(st) {
-    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now();
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now(); this.acc = { buone: 0, decini: 0, scope: 0 }; this.lastDealView = null; this.result = null;
     const names = st.players === 4 ? [st.who.split(' ')[0].replace(/^(il|la|lo|i|le|l')$/i, st.who), 'Compagno', st.who] : [st.who];
     const botNames = st.players === 4 ? ['Avversario 1', 'Il tuo compagno', 'Avversario 2'] : [st.who];
     if (st.players === 4) { botNames[0] = st.who; botNames[2] = st.who + ' 2'; }
@@ -1862,7 +1867,7 @@ const ArcadeUI = {
     setTimeout(() => this.goalbar(), 50);
   },
   startCoop(st) {
-    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now();
+    this.stage = st; this.dealsPlayed = 0; this.goalDone = false; this.bonusDone = false; this.star2Done = false; this.marginBest = -99; this.t0 = Date.now(); this.acc = { buone: 0, decini: 0, scope: 0 }; this.lastDealView = null; this.result = null;
     App.seenEventId = 0; App.view = null; App.arcade = st;
     const name = Store.get('cpz-name') || 'Tu';
     hostRoom({ players: 4, target: st.target || 999, arcade: { id: st.id, handicap: st.handicap || 0, deals: st.deals || 0, coop: true }, botLevel: st.level }, name, false);
@@ -1877,26 +1882,42 @@ const ArcadeUI = {
     g.classList.remove('hidden');
     const deals = st.deals && st.deals > 1 ? `<span class="n">${Math.min(this.dealsPlayed + 1, st.deals)}/${st.deals}</span>` : '';
     const k = (this.goalDone ? 1 : 0) + (this.star2Done ? 1 : 0) + (this.bonusDone ? 1 : 0);
-    g.innerHTML = `<button class="goalbtn" type="button" aria-label="Obiettivi della tappa"><span class="s">${'★'.repeat(k)}<i>${'★'.repeat(3 - k)}</i></span>${deals}</button>
+    const timed = [st.goal, st.star2, st.bonus].some(gg => gg && gg[0] === 'fast');
+    const limit = timed ? [st.goal, st.star2, st.bonus].filter(gg => gg && gg[0] === 'fast').map(gg => gg[1]).sort((x, y) => x - y)[0] : 0;
+    const fmt = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    const timer = timed ? `<span class="n timer" id="goal-timer" title="tempo (limite ${fmt(limit)})">${fmt(Math.floor((Date.now() - this.t0) / 1000))}</span>` : '';
+    g.innerHTML = `<button class="goalbtn" type="button" aria-label="Obiettivi della tappa"><span class="s">${'★'.repeat(k)}<i>${'★'.repeat(3 - k)}</i></span>${deals}${timer}</button>
       <div class="goalpop">
         <b class="town">${esc(st.town)}</b>
         <div class="${this.goalDone ? 'ok' : ''}"><span>★</span><span>${esc(Arcade.goalText(st.goal))}${st.handicap ? ` (lui parte da ${st.handicap})` : ''}</span><em>fatto</em></div>
         <div class="${this.star2Done ? 'ok' : ''}"><span>★★</span><span>${esc(Arcade.goalText(st.star2))}</span><em>fatto</em></div>
         <div class="${this.bonusDone ? 'ok' : ''}"><span>★★★</span><span>${esc(Arcade.goalText(st.bonus))}</span><em>fatto</em></div>
-        ${st.deals > 1 ? `<small>Smazzata ${Math.min(this.dealsPlayed + 1, st.deals)} di ${st.deals}</small>` : st.deals ? '' : `<small>Partita a ${st.target}</small>`}
+        ${st.deals > 1 ? `<small>Smazzata ${Math.min(this.dealsPlayed + 1, st.deals)} di ${st.deals}</small>` : st.deals ? '' : `<small>Partita a ${st.target}</small>`}${timed ? `<small>Tempo limite ${fmt(limit)}</small>` : ''}
       </div>`;
     const btn = g.querySelector('.goalbtn');
     btn.onclick = e => { e.stopPropagation(); g.classList.toggle('open'); Sound.play('tap'); };
+    clearInterval(this.timerIv);
+    if (timed) this.timerIv = setInterval(() => {
+      const el = $('#goal-timer'); if (!el || !this.stage || this.result) { clearInterval(this.timerIv); return; }
+      const sec = Math.floor((Date.now() - this.t0) / 1000); el.textContent = fmt(sec); el.classList.toggle('late', sec > limit);
+    }, 1000);
     if (!g._bound) { g._bound = true; document.addEventListener('pointerdown', e => { if (!g.contains(e.target)) g.classList.remove('open'); }); }
   },
   /* durante la smazzata: le condizioni che, una volta vere, restano vere (scope, settebello, piccola, grande, buona) si spuntano subito */
-  LIVE: { scope: 1, settebello: 1, piccola: 1, grande: 1, buona: 1 },
+  LIVE: { scope: 1, settebello: 1, piccola: 1, grande: 1, buona: 1, buoneN: 1, decino: 1, scopeTot: 1 },
+  /* contatori di tappa (buone, decini, scope) già accumulati + quelli della smazzata indicata */
+  accWith(deal, my, mySeats) {
+    const a = Object.assign({}, this.acc || { buone: 0, decini: 0, scope: 0 });
+    const t = deal.teams && deal.teams[my]; if (t) a.scope += t.scope || 0;
+    (deal.buone || []).forEach(b => { if (mySeats.includes(b.seat)) { a.buone++; if (b.type === 'decino') a.decini++; } });
+    return a;
+  },
   liveCheck(view) {
     const st = this.stage; if (!st || !view.captured) return;
     let partial; try { partial = C.scoreDeal(view.captured, view.scope, view.cfg); } catch (e) { return; }
     partial.buone = view.buone || [];
     const my = C.teamOf(view, App.mySeat), ot = 1 - my;
-    const ctx = { deal: partial, my, ot, mySeats: view.teams[my], scores: view.scores, won: false, elapsed: null };
+    const ctx = { deal: partial, my, ot, mySeats: view.teams[my], scores: view.scores, won: false, elapsed: null, acc: this.accWith(partial, my, view.teams[my]) };
     let changed = false;
     const test = (g, flag) => { if (!g || this[flag] || !this.LIVE[g[0]]) return; if (Arcade.goalCheck(g, ctx)) { this[flag] = true; changed = true; } };
     test(st.goal, 'goalDone'); test(st.star2, 'star2Done'); test(st.bonus, 'bonusDone');
@@ -1908,7 +1929,8 @@ const ArcadeUI = {
     const my = C.teamOf(view, App.mySeat), ot = 1 - my; const d = view.lastDeal;
     const mySeats = view.teams[my];
     const won = view.phase === 'gameEnd' && view.winner === my;
-    const ctx = { deal: d, my, ot, mySeats, scores: view.scores, won, elapsed: Math.round((Date.now() - this.t0) / 1000) };
+    const ctx = { deal: d, my, ot, mySeats, scores: view.scores, won, elapsed: Math.round((Date.now() - this.t0) / 1000), acc: this.accWith(d, my, mySeats) };
+    this.acc = ctx.acc; this.lastDealView = view;
     this.dealsPlayed++;
     if (Arcade.goalCheck(st.goal, ctx)) this.goalDone = true;
     if (st.star2 && Arcade.goalCheck(st.star2, ctx)) this.star2Done = true;
@@ -1936,24 +1958,38 @@ const ArcadeUI = {
     }, i * 1200));
   },
   showResult(view) {
-    const st = this.stage, r = this.result; const nextSt = Arcade.STAGES.find(x => x.id === st.id + 1);
-    const m = modal(`<h2>${r.won ? 'Tappa superata!' : 'Tappa fallita'}<small>${esc(st.town)} · ${esc(st.who)}</small></h2>
+    const st = this.stage, r = this.result;
+    const list = Arcade.stagesFor(this.mode); const nextSt = list[list.indexOf(st) + 1] || null;
+    const d = view.lastDeal;
+    const elapsed = Math.round((Date.now() - this.t0) / 1000), fmt = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    const timed = [st.goal, st.star2, st.bonus].some(gg => gg && gg[0] === 'fast');
+    const nextBlock = nextSt ? `<details class="next-brief" ${r.won ? 'open' : ''}><summary>Prossima tappa: <b>${esc(nextSt.town)}</b> · contro ${esc(nextSt.who)}</summary>
+        <div class="stars-brief compact">
+          <div><span>★</span><span>${esc(Arcade.goalText(nextSt.goal))}${nextSt.handicap ? ` (lui parte da ${nextSt.handicap})` : ''}</span></div>
+          <div><span>★★</span><span>${esc(Arcade.goalText(nextSt.star2))}</span></div>
+          <div><span>★★★</span><span>${esc(Arcade.goalText(nextSt.bonus))}</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--testo-2);margin:4px 0 0">${nextSt.deals ? (nextSt.deals === 1 ? 'Una smazzata' : nextSt.deals + ' smazzate') : 'Partita a ' + nextSt.target} · computer ${['ingenuo', 'medio', 'furbo', 'campione'][nextSt.level]}</p>
+      </details>` : '';
+    const m = modal(`<h2>${r.won ? 'Tappa superata!' : 'Tappa fallita'}<small>${esc(st.town)} · ${esc(st.who)}${timed ? ` · ${fmt(elapsed)}` : ''}</small></h2>
       <div class="stars-big">${'★'.repeat(r.stars)}<span class="off">${'★'.repeat(3 - r.stars)}</span></div>
       <div class="starlist">
-        <div class="${this.starsDetail.goal ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.goal))}</div>
-        <div class="${this.starsDetail.goal && this.starsDetail.s2 ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.star2))}</div>
-        <div class="${this.starsDetail.goal && this.starsDetail.s3 ? 'ok' : ''}"><span>★</span>${esc(Arcade.goalText(st.bonus))}</div>
+        <div class="${this.starsDetail.goal ? 'ok' : 'ko'}"><span>${this.starsDetail.goal ? '★' : '✕'}</span>${esc(Arcade.goalText(st.goal))}</div>
+        <div class="${this.starsDetail.goal && this.starsDetail.s2 ? 'ok' : 'ko'}"><span>${this.starsDetail.goal && this.starsDetail.s2 ? '★' : '✕'}</span>${esc(Arcade.goalText(st.star2))}</div>
+        <div class="${this.starsDetail.goal && this.starsDetail.s3 ? 'ok' : 'ko'}"><span>${this.starsDetail.goal && this.starsDetail.s3 ? '★' : '✕'}</span>${esc(Arcade.goalText(st.bonus))}</div>
       </div>
-      <div class="actions"><button class="btn ghost" id="res-map">Mappa</button><button class="btn" id="res-retry">${r.won ? 'Rigioca' : 'Riprova'}</button>${r.won && nextSt ? `<button class="btn oro" id="res-next">Prossima: ${esc(nextSt.town)}</button>` : ''}</div>`, { closable: false });
+      ${d ? `<details class="res-table" ${r.won ? '' : 'open'}><summary>Com'è andata l'ultima smazzata</summary>${dealTableHTML(view, d)}</details>` : ''}
+      ${nextBlock}
+      <div class="actions"><button class="btn ghost" id="res-map">Mappa</button><button class="btn" id="res-retry">${r.won ? 'Rigioca' : 'Riprova'}</button>${r.won && nextSt ? `<button class="btn oro" id="res-next">Vai a ${esc(nextSt.town)}</button>` : ''}</div>`, { closable: false });
     m.querySelector('.modal').classList.add(r.won ? 'won' : 'lost');
     if (r.won) Stage.sparks();
     m.querySelector('#res-map').onclick = () => { m.remove(); this.leave(); this.open(); };
     m.querySelector('#res-retry').onclick = () => { m.remove(); this.leave(); this.start(st); };
-    const nb = m.querySelector('#res-next'); if (nb) nb.onclick = () => { m.remove(); this.leave(); this.start(nextSt); };
+    const nb = m.querySelector('#res-next'); if (nb) nb.onclick = () => { m.remove(); this.leave(); this.mode === 'coop' ? this.startCoop(nextSt) : this.start(nextSt); };
   },
   leave() {
     if (App.mode === 'host' && App.peer) { try { Host.broadcast({ t: 'bye' }); App.peer.destroy(); } catch (e) {} App.peer = null; Session.clear(); }
-    this.stage = null; App.arcade = null; App.view = null; App.seenEventId = 0;
+    this.stage = null; App.arcade = null; App.view = null; App.seenEventId = 0; clearInterval(this.timerIv);
     clearTimeout(Host.botTimer); Host.game = null;
     Stage.nodes.forEach(n => n.remove()); Stage.nodes.clear(); Stage.playerEls.forEach(e => e.remove()); Stage.playerEls.clear();
     $$('#modals .modal-bg').forEach(x => x.remove());
